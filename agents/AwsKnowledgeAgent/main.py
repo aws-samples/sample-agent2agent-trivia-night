@@ -20,7 +20,7 @@ aws_knowledge_client = MCPClient(
     },
 )
 
-# Bedrock model (Claude Sonnet 4 by default)
+# Bedrock model (Claude Sonnet 4.5 by default)
 model = BedrockModel(
     model_id="global.anthropic.claude-sonnet-4-5-20250929-v1:0",
     region_name="us-east-1",
