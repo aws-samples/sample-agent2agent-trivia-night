@@ -1,0 +1,163 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Add AgentCore policies to the Code Editor instance bootstrap role
+
+Parameters:
+  StackPrefix:
+    Type: String
+    Description: Prefix used for cross-stack resource naming
+    Default: Workshop
+
+Resources:
+  CDKBootstrapPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: CDKBootstrapPolicy
+      Roles:
+        - !ImportValue
+          Fn::Sub: ${StackPrefix}-CodeEditorInstanceBootstrapRoleName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - cloudformation:CreateChangeSet
+              - cloudformation:CreateStack
+              - cloudformation:DeleteStack
+              - cloudformation:DescribeChangeSet
+              - cloudformation:DescribeStackEvents
+              - cloudformation:DescribeStacks
+              - cloudformation:ExecuteChangeSet
+              - cloudformation:GetTemplate
+            Resource: !Sub "arn:${AWS::Partition}:cloudformation:*:*:stack/CDKToolkit/*"
+          - Effect: Allow
+            Action:
+              - iam:CreateRole
+              - iam:DeleteRole
+              - iam:GetRole
+              - iam:GetRolePolicy
+              - iam:AttachRolePolicy
+              - iam:DetachRolePolicy
+              - iam:DeleteRolePolicy
+              - iam:PutRolePolicy
+              - iam:TagRole
+            Resource:
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/*"
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-*"
+          - Effect: Allow
+            Action:
+              - s3:CreateBucket
+              - s3:DeleteBucket
+              - s3:PutBucketPolicy
+              - s3:DeleteBucketPolicy
+              - s3:PutBucketPublicAccessBlock
+              - s3:PutBucketVersioning
+              - s3:PutEncryptionConfiguration
+              - s3:PutLifecycleConfiguration
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+              - s3:ListBucket
+              - s3:GetBucketLocation
+              - s3:GetBucketVersioning
+              - s3:GetBucketAcl
+              - s3:PutBucketAcl
+              - s3:PutBucketEncryption
+              - s3:PutBucketLifecycle
+            Resource:
+              - "arn:aws:s3:::cdk-*"
+          - Effect: Allow
+            Action:
+              - ssm:DeleteParameter
+              - ssm:GetParameter
+              - ssm:GetParameters
+              - ssm:PutParameter
+            Resource:
+              - !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cdk-bootstrap/*"
+          - Effect: Allow
+            Action:
+              - ecr:CreateRepository
+              - ecr:DeleteRepository
+              - ecr:DescribeRepositories
+              - ecr:SetRepositoryPolicy
+              - ecr:PutLifecyclePolicy
+              - ecr:TagResource
+            Resource:
+              - !Sub "arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/cdk-*"
+          - Effect: Allow
+            Action:
+              - kms:CreateKey
+              - kms:CreateAlias
+              - kms:DeleteAlias
+              - kms:DescribeKey
+              - kms:GetKeyPolicy
+              - kms:PutKeyPolicy
+              - kms:TagResource
+              - kms:EnableKeyRotation
+              - kms:ScheduleKeyDeletion
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-*"
+
+  AgentCoreCLIPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: AgentCoreCLIPolicy
+      Roles:
+        - !ImportValue
+          Fn::Sub: ${StackPrefix}-CodeEditorInstanceBootstrapRoleName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - cloudformation:DescribeStacks
+              - cloudformation:ListStacks
+              - cloudformation:DeleteStack
+              - cloudformation:CreateChangeSet
+              - cloudformation:ExecuteChangeSet
+              - cloudformation:DeleteChangeSet
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - ssm:UpdateInstanceInformation
+              - ssm:PutParameter
+              - ssm:DeleteParameter
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - bedrock-agentcore:GetWorkloadAccessTokenForUserId
+              - bedrock-agentcore:CreateWorkloadIdentity
+              - bedrock-agentcore:CreateAgentRuntime
+              - bedrock-agentcore:InvokeAgentRuntime
+              - bedrock-agentcore:InvokeAgentRuntimeForUser
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:CreateLogGroup
+            Resource: !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock-agentcore/runtimes/*"
+          - Effect: Allow
+            Action:
+              - iam:CreateRole
+              - iam:PutRolePolicy
+            Resource:
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/AgentCore-*"
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/AgentCore-*"
+          - Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+              - bedrock:InvokeModelWithResponseStream
+            Resource:
+              - !Sub "arn:${AWS::Partition}:bedrock:*::foundation-model/*"
+              - !Sub "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:*"
+          - Effect: Allow
+            Action:
+              - "aws-marketplace:Subscribe"
+              - "aws-marketplace:ViewSubscriptions"
+              - "aws-marketplace:Unsubscribe"
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:CalledViaLast: "bedrock.amazonaws.com"

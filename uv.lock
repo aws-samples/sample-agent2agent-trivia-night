@@ -9,6 +9,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "bedrock-agentcore" },
     { name = "bedrock-agentcore-starter-toolkit" },
+    { name = "mcp" },
     { name = "strands-agents" },
 ]
 
@@ -16,6 +17,7 @@ dependencies = [
 requires-dist = [
     { name = "bedrock-agentcore", specifier = ">=1.4.0" },
     { name = "bedrock-agentcore-starter-toolkit", specifier = ">=0.3.0" },
+    { name = "mcp", specifier = ">=1.26.0" },
     { name = "strands-agents", specifier = ">=1.28.0" },
 ]
 

@@ -1,6 +1,10 @@
 Description: Create a Code Editor instance with an Amazon CloudFront distribution for use in Workshop Studio. Version 1.5.0
 
 Parameters:
+  StackPrefix:
+    Type: String
+    Description: Prefix used for cross-stack resource naming
+    Default: Workshop
   CodeEditorUser:
     Type: String
     Description: UserName for Code Editor
@@ -21,7 +25,7 @@ Parameters:
     Description: Code Editor EC2 operating system
     Type: String
     Default: AmazonLinux-2023
-    AllowedValues: ['AmazonLinux-2023', 'Ubuntu-22', 'Ubuntu-24']
+    AllowedValues: ["AmazonLinux-2023", "Ubuntu-22", "Ubuntu-24"]
   HomeFolder:
     Type: String
     Description: Folder to open in Code Editor
@@ -29,7 +33,7 @@ Parameters:
   DevServerBasePath:
     Type: String
     Description: Base path for the application to be added to Nginx sites-available list
-    Default: ''
+    Default: ""
   DevServerPort:
     Type: Number
     Description: Port for the DevServer
@@ -37,28 +41,29 @@ Parameters:
   RepoUrl:
     Description: Remote repo URL to clone. To not clone a remote repo, leave blank
     Type: String
-    Default: ''
+    Default: ""
   AssetZipS3Path:
     Description: S3 path holding the asset zip file to be copied into the home folder. To not include any assets, leave blank
     Type: String
-    Default: ''
+    Default: ""
   BranchZipS3Path:
     Description: S3 path holding the branches zip file to be checked into the git repo, with each folder being a branch. The content of each folder will added as under a branch, with the folder name being used as the branch name. To leave the empty, leave blank
     Type: String
-    Default: ''
+    Default: ""
   FolderZipS3Path:
     Description: S3 path holding the folder zip file, with each folder being a subfolder of the home directory. Each folder will have its own local git repo. To not include any folders, leave blank
     Type: String
-    Default: ''
+    Default: ""
 
 Conditions:
-  IsAL2023: !Equals [!Ref InstanceOperatingSystem, 'AmazonLinux-2023']
-  IsGraviton: !Not [
-    !Equals [
-      !Select [0, !Split ['g', !Select [0, !Split ['.', !Ref InstanceType]]]],
-      !Select [0, !Split ['.', !Ref InstanceType]]
+  IsAL2023: !Equals [!Ref InstanceOperatingSystem, "AmazonLinux-2023"]
+  IsGraviton:
+    !Not [
+      !Equals [
+        !Select [0, !Split ["g", !Select [0, !Split [".", !Ref InstanceType]]]],
+        !Select [0, !Split [".", !Ref InstanceType]],
+      ],
     ]
-  ]
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -109,23 +114,23 @@ Metadata:
 
 Mappings:
   ArmImage:
-  # aws ssm get-parameters-by-path --path "/aws/service/canonical/ubuntu/" --recursive --query "Parameters[*].Name"  > canonical-ami.txt
-  # aws ssm get-parameters-by-path --path "/aws/service/ami-amazon-linux-latest/" --recursive --query "Parameters[*].Name"  > amazon-ami.txt
+    # aws ssm get-parameters-by-path --path "/aws/service/canonical/ubuntu/" --recursive --query "Parameters[*].Name"  > canonical-ami.txt
+    # aws ssm get-parameters-by-path --path "/aws/service/ami-amazon-linux-latest/" --recursive --query "Parameters[*].Name"  > amazon-ami.txt
     Ubuntu-22:
-      ImageId: '{{resolve:ssm:/aws/service/canonical/ubuntu/server/jammy/stable/current/arm64/hvm/ebs-gp2/ami-id}}'
+      ImageId: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/jammy/stable/current/arm64/hvm/ebs-gp2/ami-id}}"
     Ubuntu-24:
-      ImageId: '{{resolve:ssm:/aws/service/canonical/ubuntu/server/noble/stable/current/arm64/hvm/ebs-gp3/ami-id}}'
+      ImageId: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/noble/stable/current/arm64/hvm/ebs-gp3/ami-id}}"
     AmazonLinux-2023:
-      ImageId: '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64}}'
+      ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64}}"
   AmdImage:
     Ubuntu-22:
-      ImageId: '{{resolve:ssm:/aws/service/canonical/ubuntu/server/jammy/stable/current/amd64/hvm/ebs-gp2/ami-id}}'
+      ImageId: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/jammy/stable/current/amd64/hvm/ebs-gp2/ami-id}}"
     Ubuntu-24:
-      ImageId: '{{resolve:ssm:/aws/service/canonical/ubuntu/server/noble/stable/current/amd64/hvm/ebs-gp3/ami-id}}'
+      ImageId: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/noble/stable/current/amd64/hvm/ebs-gp3/ami-id}}"
     AmazonLinux-2023:
-      ImageId: '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
   AWSRegionsPrefixListID:
-  # aws ec2 describe-managed-prefix-lists  --region <REGION> | jq -r '.PrefixLists[] | select (.PrefixListName == "com.amazonaws.global.cloudfront.origin-facing") | .PrefixListId'
+    # aws ec2 describe-managed-prefix-lists  --region <REGION> | jq -r '.PrefixLists[] | select (.PrefixListName == "com.amazonaws.global.cloudfront.origin-facing") | .PrefixListId'
     ap-northeast-1:
       PrefixList: pl-58a04531
     ap-northeast-2:
@@ -171,13 +176,17 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       Name: !Sub
-      - ${InstanceName}-${RandomGUID}
-      - RandomGUID: !Select [0, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId ]]]]
+        - ${InstanceName}-${RandomGUID}
+        - RandomGUID:
+            !Select [
+              0,
+              !Split ["-", !Select [2, !Split ["/", !Ref AWS::StackId]]],
+            ]
       Description: Code Editor user details
       GenerateSecretString:
         PasswordLength: 16
         SecretStringTemplate: !Sub '{"username":"${CodeEditorUser}"}'
-        GenerateStringKey: 'password'
+        GenerateStringKey: "password"
         ExcludePunctuation: true
 
   SecretPlaintextLambdaRole:
@@ -283,7 +292,7 @@ Resources:
     Properties:
       DocumentType: Command
       Content:
-        schemaVersion: '2.2'
+        schemaVersion: "2.2"
         description: Install CodeEditor Extension
         parameters:
           ExtensionId:
@@ -292,17 +301,17 @@ Resources:
             type: String
           MaxRetries:
             type: String
-            default: '3'
+            default: "3"
           FailureReturnValue:
             type: String
-            default: '0'
+            default: "0"
         mainSteps:
           - name: InstallCodeEditorExtension
             action: aws:runShellScript
             inputs:
               timeoutSeconds: 300
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - |
                   extension_name="{{ ExtensionId }}"
                   max_retries={{ MaxRetries }}
@@ -337,12 +346,12 @@ Resources:
     Properties:
       DocumentType: Command
       Content:
-        schemaVersion: '2.2'
+        schemaVersion: "2.2"
         description: Bootstrap Code Editor instance
         parameters:
           LinuxFlavor:
             type: String
-            default: 'al2023'
+            default: "al2023"
           CodeEditorPassword:
             type: String
             default: !Ref AWS::StackId
@@ -362,17 +371,17 @@ Resources:
                 action: configure
                 mode: ec2
                 optionalConfigurationSource: default
-                optionalRestart: 'yes'
+                optionalRestart: "yes"
           - name: InstallAptPackagesApt
             action: aws:runShellScript
             precondition:
               StringEquals:
-                - '{{ LinuxFlavor }}'
+                - "{{ LinuxFlavor }}"
                 - ubuntu
             inputs:
               timeoutSeconds: 300
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - dpkg --configure -a
                 - apt-get -q update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q apt-utils
@@ -386,24 +395,24 @@ Resources:
             action: aws:runShellScript
             precondition:
               StringEquals:
-                - '{{ LinuxFlavor }}'
+                - "{{ LinuxFlavor }}"
                 - al2023
             inputs:
               timeoutSeconds: 300
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - dnf install -y --allowerasing curl gnupg whois argon2 unzip nginx openssl jq
           - name: InstallBasePackagesApt
             action: aws:runShellScript
             precondition:
               StringEquals:
-                - '{{ LinuxFlavor }}'
+                - "{{ LinuxFlavor }}"
                 - ubuntu
             inputs:
               timeoutSeconds: 300
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - dpkg --configure -a
                 - apt-get -q update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q curl gnupg whois argon2 unzip nginx openssl locales locales-all apt-transport-https ca-certificates software-properties-common jq
@@ -411,12 +420,12 @@ Resources:
             action: aws:runShellScript
             precondition:
               StringEquals:
-                - '{{ LinuxFlavor }}'
+                - "{{ LinuxFlavor }}"
                 - al2023
             inputs:
               timeoutSeconds: 300
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - !Sub |
                   echo 'Adding user: ${CodeEditorUser}'
@@ -431,12 +440,12 @@ Resources:
             action: aws:runShellScript
             precondition:
               StringEquals:
-                - '{{ LinuxFlavor }}'
+                - "{{ LinuxFlavor }}"
                 - ubuntu
             inputs:
               timeoutSeconds: 300
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - dpkg --configure -a
                 - !Sub |
@@ -461,7 +470,7 @@ Resources:
             inputs:
               timeoutSeconds: 300
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - echo LANG=en_US.utf-8 >> /etc/environment
                 - echo LC_ALL=en_US.UTF-8 >> /etc/environment
@@ -477,7 +486,7 @@ Resources:
             inputs:
               timeoutSeconds: 300
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - !Sub sudo -u ${CodeEditorUser} curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip -o /tmp/aws-cli.zip
                 - unzip -q -d /tmp /tmp/aws-cli.zip
@@ -489,12 +498,12 @@ Resources:
             action: aws:runShellScript
             precondition:
               StringEquals:
-                - '{{ LinuxFlavor }}'
+                - "{{ LinuxFlavor }}"
                 - al2023
             inputs:
               timeoutSeconds: 300
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - dnf install -y git
                 - !Sub |
@@ -508,12 +517,12 @@ Resources:
             action: aws:runShellScript
             precondition:
               StringEquals:
-                - '{{ LinuxFlavor }}'
+                - "{{ LinuxFlavor }}"
                 - ubuntu
             inputs:
               timeoutSeconds: 300
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - dpkg --configure -a
                 - add-apt-repository ppa:git-core/ppa
@@ -530,7 +539,7 @@ Resources:
             inputs:
               timeoutSeconds: 300
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - !Sub sudo -u ${CodeEditorUser} git config --global user.email "participant@example.com"
                 - !Sub sudo -u ${CodeEditorUser} git config --global user.name "Workshop Participant"
@@ -542,7 +551,7 @@ Resources:
             inputs:
               timeoutSeconds: 600
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - !Sub |
                   if [[ -z "${RepoUrl}" ]]
@@ -561,7 +570,7 @@ Resources:
             inputs:
               timeoutSeconds: 600
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - !Sub |
                   if [[ -z "${AssetZipS3Path}" ]]
@@ -591,7 +600,7 @@ Resources:
             inputs:
               timeoutSeconds: 600
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - !Sub |
                   if [[ -z "${FolderZipS3Path}" ]]
@@ -637,7 +646,7 @@ Resources:
             inputs:
               timeoutSeconds: 600
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - !Sub |
                   if [[ -z "${BranchZipS3Path}" ]]
@@ -683,7 +692,7 @@ Resources:
             inputs:
               timeoutSeconds: 600
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - !Sub export CodeEditorUser=${CodeEditorUser}
                 - curl -fsSL https://code-editor.amazonaws.com/content/code-editor-server/dist/aws-workshop-studio/install.sh | bash -s -- 2>&1 || { echo "Code Editor installation failed"; exit 1; }
@@ -692,7 +701,7 @@ Resources:
             inputs:
               timeoutSeconds: 600
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - echo "Configuring nginx..."
                 - !Sub |
@@ -736,7 +745,7 @@ Resources:
             inputs:
               timeoutSeconds: 600
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - !Sub |
                   sudo -u ${CodeEditorUser} mkdir -p /home/${CodeEditorUser}/.code-editor-server/data
@@ -748,7 +757,7 @@ Resources:
             inputs:
               timeoutSeconds: 600
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 - set -euo pipefail
                 - !Sub sudo -i -u ${CodeEditorUser} mkdir -p /home/${CodeEditorUser}/.code-editor-server/data/User
                 - !Sub sudo -i -u ${CodeEditorUser} touch /home/${CodeEditorUser}/.code-editor-server/data/User/settings.json
@@ -817,14 +826,14 @@ Resources:
             inputs:
               timeoutSeconds: 300
               runCommand:
-                - '#!/bin/bash'
+                - "#!/bin/bash"
                 # - set -euo pipefail # Uncomment to throw error on failure
                 - !Sub sudo -u ${CodeEditorUser} curl -fsSL https://cli.kiro.dev/install -o /tmp/kiro_cli_install.sh
                 - !Sub sudo -u ${CodeEditorUser} bash /tmp/kiro_cli_install.sh 2>&1
                 - echo "Kiro CLI installed. Checking configuration"
                 - !Sub sudo -i -u ${CodeEditorUser} kiro-cli --version
-# Install optional packages here
-# Install Workshop specific packages here
+  # Install optional packages here
+  # Install Workshop specific packages here
 
   SSMDocLambdaRole:
     Type: AWS::IAM::Role
@@ -859,7 +868,7 @@ Resources:
                 Action:
                   - ssm:ListCommandInvocations
                   - ssm:GetCommandInvocation
-                Resource: '*'
+                Resource: "*"
 
   RunSSMDocLambda:
     Type: AWS::Lambda::Function
@@ -977,7 +986,7 @@ Resources:
       DocumentName: !Ref CodeEditorSSMDoc
       CloudWatchLogGroupName: !Sub /aws/ssm/${CodeEditorSSMDoc}
       CodeEditorPassword: !GetAtt SecretPlaintext.password
-      LinuxFlavor: !If [IsAL2023, 'al2023', 'ubuntu']
+      LinuxFlavor: !If [IsAL2023, "al2023", "ubuntu"]
 
   CodeEditorInstanceBootstrapRole:
     Type: AWS::IAM::Role
@@ -1030,8 +1039,8 @@ Resources:
           runcmd:
             - mkdir -p ${HomeFolder} && chown -R ${CodeEditorUser}:${CodeEditorUser} ${HomeFolder}
       Tags:
-      - Key: Name
-        Value: !Ref InstanceName
+        - Key: Name
+          Value: !Ref InstanceName
 
   CodeEditorInstanceEIP:
     Type: AWS::EC2::EIP
@@ -1052,8 +1061,12 @@ Resources:
         MaxTTL: 31536000
         MinTTL: 1
         Name: !Sub
-        - ${InstanceName}-${RandomGUID}
-        - RandomGUID: !Select [0, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId ]]]]
+          - ${InstanceName}-${RandomGUID}
+          - RandomGUID:
+              !Select [
+                0,
+                !Split ["-", !Select [2, !Split ["/", !Ref AWS::StackId]]],
+              ]
         ParametersInCacheKeyAndForwardedToOrigin:
           CookiesConfig:
             CookieBehavior: all
@@ -1101,7 +1114,7 @@ Resources:
             OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3 # Managed-AllViewer - see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html#:~:text=When%20using%20AWS,47e4%2Db989%2D5492eafa07d3
             TargetOriginId: !Sub CloudFront-${AWS::StackName}
             ViewerProtocolPolicy: allow-all
-            PathPattern: '/proxy/*'
+            PathPattern: "/proxy/*"
         DefaultCacheBehavior:
           AllowedMethods:
             - GET
@@ -1135,7 +1148,8 @@ Resources:
           IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          SourcePrefixListId: !FindInMap [AWSRegionsPrefixListID, !Ref 'AWS::Region', PrefixList]
+          SourcePrefixListId:
+            !FindInMap [AWSRegionsPrefixListID, !Ref "AWS::Region", PrefixList]
 
   CodeEditorHealthCheckLambdaRole:
     Type: AWS::IAM::Role
@@ -1429,3 +1443,11 @@ Outputs:
   URL:
     Description: Code Editor URL
     Value: !Sub https://${CloudFrontDistribution.DomainName}/?folder=${HomeFolder}&tkn=${SecretPlaintext.password}
+  CodeEditorInstanceBootstrapRoleArn:
+    Description: ARN of the Code Editor instance bootstrap role
+    Value: !GetAtt CodeEditorInstanceBootstrapRole.Arn
+  CodeEditorInstanceBootstrapRoleName:
+    Description: Name of the Code Editor instance bootstrap role
+    Value: !Ref CodeEditorInstanceBootstrapRole
+    Export:
+      Name: !Sub ${StackPrefix}-CodeEditorInstanceBootstrapRoleName

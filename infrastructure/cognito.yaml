@@ -1,0 +1,210 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Basic Cognito User Pool. Creates a User Pool, app client, and a pre-seeded test user.
+
+Parameters:
+  PoolName:
+    Type: String
+    Default: "MCPServerPool"
+    Description: "Name of the Cognito User Pool"
+
+  TestUsername:
+    Type: String
+    Default: "testuser"
+    Description: "Username for the pre-created app user"
+
+  TestUserPassword:
+    Type: String
+    NoEcho: true
+    Default: "MyPassword123!"
+    Description: "Permanent password for the app user"
+    MinLength: 8
+
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      UserPoolName: !Ref PoolName
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 7
+
+  AppClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: "MCPServerPoolClient"
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+
+  # Domain required for OAuth2 token endpoint (used by M2M client_credentials flow)
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Select [2, !Split ['/', !Ref 'AWS::StackId']]
+
+  # Resource server defines custom OAuth2 scopes for the M2M client
+  ResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      Identifier: !Sub '${PoolName}-api'
+      Name: !Sub '${PoolName}-resource-server'
+      Scopes:
+        - ScopeName: 'read'
+          ScopeDescription: 'Read access'
+        - ScopeName: 'write'
+          ScopeDescription: 'Write access'
+
+  # M2M client using client_credentials flow (no user interaction)
+  M2MClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: ResourceServer
+    Properties:
+      ClientName: !Sub '${PoolName}-m2m-client'
+      UserPoolId: !Ref UserPool
+      GenerateSecret: true
+      AllowedOAuthFlows:
+        - client_credentials
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes:
+        - !Sub '${PoolName}-api/read'
+        - !Sub '${PoolName}-api/write'
+      SupportedIdentityProviders:
+        - COGNITO
+      PreventUserExistenceErrors: ENABLED
+
+  # Lambda + custom resource to create the test user with a permanent password,
+  # mirroring admin_create_user + admin_set_user_password from the Python script.
+  CreateUserRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: CognitoCreateUser
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminSetUserPassword
+                  - cognito-idp:AdminDeleteUser
+                Resource: !GetAtt UserPool.Arn
+
+  CreateUserFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${PoolName}-create-test-user"
+      Description: "Creates a test user with a permanent password in the Cognito User Pool"
+      Runtime: python3.13
+      Handler: index.handler
+      Role: !GetAtt CreateUserRole.Arn
+      Timeout: 30
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          cognito = boto3.client('cognito-idp')
+
+          def handler(event, context):
+              props = event['ResourceProperties']
+              pool_id = props['UserPoolId']
+              username = props['Username']
+              password = props['Password']
+              physical_id = f'{pool_id}/{username}'
+
+              try:
+                  if event['RequestType'] in ('Create', 'Update'):
+                      try:
+                          cognito.admin_create_user(
+                              UserPoolId=pool_id,
+                              Username=username,
+                              TemporaryPassword='Temp123!',
+                              MessageAction='SUPPRESS'
+                          )
+                      except cognito.exceptions.UsernameExistsException:
+                          logger.info('User already exists, setting password')
+
+                      cognito.admin_set_user_password(
+                          UserPoolId=pool_id,
+                          Username=username,
+                          Password=password,
+                          Permanent=True
+                      )
+                      logger.info(f'User {username} ready')
+
+                  elif event['RequestType'] == 'Delete':
+                      try:
+                          cognito.admin_delete_user(
+                              UserPoolId=pool_id,
+                              Username=username
+                          )
+                          logger.info(f'User {username} deleted')
+                      except cognito.exceptions.UserNotFoundException:
+                          logger.info('User already gone')
+
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, physical_id)
+              except Exception as e:
+                  logger.error(f'Error: {e}', exc_info=True)
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)}, physical_id)
+
+  TestUser:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt CreateUserFunction.Arn
+      UserPoolId: !Ref UserPool
+      Username: !Ref TestUsername
+      Password: !Ref TestUserPassword
+
+Outputs:
+  UserPoolId:
+    Description: "Cognito User Pool ID"
+    Value: !Ref UserPool
+
+  AppClientId:
+    Description: "User-based app client ID (SRP flow)"
+    Value: !Ref AppClient
+
+  M2MClientId:
+    Description: "M2M client ID (client_credentials flow)"
+    Value: !Ref M2MClient
+
+  TokenEndpoint:
+    Description: "OAuth2 token endpoint for M2M authentication"
+    Value: !Sub
+      - 'https://${Domain}.auth.${AWS::Region}.amazoncognito.com/oauth2/token'
+      - Domain: !Select [2, !Split ['/', !Ref 'AWS::StackId']]
+
+  DiscoveryUrl:
+    Description: "OIDC discovery URL"
+    Value: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}/.well-known/openid-configuration"
+
+  TestUsername:
+    Description: "Pre-created test username"
+    Value: !Ref TestUsername
