@@ -6,3 +6,4 @@ __pycache__
 .scratch
 agents/AWSKnowledgeAgent-base
 agents/myMCPServer
+aws-targets.json

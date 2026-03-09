@@ -5,7 +5,7 @@ from botocore.exceptions import ClientError
 # Initialize the Bedrock AgentCore client
 client = boto3.client("bedrock-agentcore")
 # Update with your AgentCore Runtime ARN
-runtime_arn = "arn:aws:bedrock-agentcore:XXX:XXXXXXXXXXXX:runtime/XXX"
+runtime_arn = "arn:aws:bedrock-agentcore:XXX:YYY:runtime/ZZZ"
 
 
 def call_mcp(method, params=None):
@@ -56,9 +56,10 @@ def main():
     print()
 
     # Example: Call invoke tool
-    print("invoke(Hello)")
+    print("invoke('Tell me about Bedrock AgentCore')")
     result = call_mcp(
-        "tools/call", {"name": "invoke", "arguments": {"request": "Hello"}}
+        "tools/call",
+        {"name": "invoke", "arguments": {"request": "Tell me about Bedrock AgentCore"}},
     )
 
     print(result["content"][0]["text"])

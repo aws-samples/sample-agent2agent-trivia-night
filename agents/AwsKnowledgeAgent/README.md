@@ -1,10 +1,10 @@
-# AgentCore Project
+# AWS Knowledge Agent
 
-This project was created with the [AgentCore CLI](https://github.com/aws/agentcore-cli).
+An Agent-as-MCP example using Amazon Bedrock AgentCore
 
 ## Project Structure
 
-```
+```bash
 .
 my-project/
 ├── agentcore/
