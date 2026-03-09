@@ -6,7 +6,9 @@ from strands.models.bedrock import BedrockModel
 from strands.tools.mcp import MCPClient
 import jwt
 import json
-
+import boto3
+import base64
+import urllib
 
 app = BedrockAgentCoreApp()
 log = app.logger
@@ -14,24 +16,63 @@ _agent = None
 
 
 REGION = os.getenv("AWS_REGION")
+POOL_NAME = "CognitoUserPool"
 MODEL_ID = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+AWS_KNOWLEDGE_AGENT_ARN = "arn:aws:bedrock-agentcore:XXX:YYY:runtime/ZZZ"
 
+
+def get_ssm_param(ssm, path: str) -> str:
+    return ssm.get_parameter(Name=path)["Parameter"]["Value"]
+
+
+def get_m2m_client_secret(user_pool_id: str, client_id: str, region: str) -> str:
+    cognito = boto3.client("cognito-idp", region_name=region)
+    response = cognito.describe_user_pool_client(
+        UserPoolId=user_pool_id, ClientId=client_id
+    )
+    return response["UserPoolClient"]["ClientSecret"]
+
+
+def fetch_token(token_endpoint: str, client_id: str, client_secret: str) -> str:
+    credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+    req = urllib.request.Request(
+        token_endpoint,
+        data=b"grant_type=client_credentials",
+        headers={
+            "Authorization": f"Basic {credentials}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req) as resp:
+        return json.loads(resp.read().decode())["access_token"]
+
+
+def get_bearer_token(pool_name: str, region: str) -> str:
+    ssm = boto3.client("ssm", region_name=region)
+    prefix = f"/{pool_name}/m2m"
+    user_pool_id = get_ssm_param(ssm, f"{prefix}/user-pool-id")
+    client_id = get_ssm_param(ssm, f"{prefix}/client-id")
+    token_endpoint = get_ssm_param(ssm, f"{prefix}/token-endpoint")
+    client_secret = get_m2m_client_secret(user_pool_id, client_id, region)
+    return fetch_token(token_endpoint, client_id, client_secret)
+
+
+token = get_bearer_token(POOL_NAME, REGION)
+print(token)
 # Define a collection of tools used by the model
 tools = []
 
-
-# Define a simple function tool
-@tool
-def add_numbers(a: int, b: int) -> int:
-    """Return the sum of two numbers"""
-    return a + b
-
-
-tools.append(add_numbers)
-
 # Add example remote MCP Server
-EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"
-mcp_client = MCPClient(lambda: streamablehttp_client(EXAMPLE_MCP_ENDPOINT))
+# MCP_ENDPOINT = "https://mcp.exa.ai/mcp"
+encoded_arn = AWS_KNOWLEDGE_AGENT_ARN.replace(":", "%3A").replace("/", "%2F")
+MCP_ENDPOINT = f"https://bedrock-agentcore.{REGION}.amazonaws.com/runtimes/{encoded_arn}/invocations?qualifier=DEFAULT"
+
+mcp_client = MCPClient(
+    lambda: streamablehttp_client(
+        url=MCP_ENDPOINT, headers={"Authorization": f"Bearer {token}"}
+    )
+)
 tools.append(mcp_client)
 
 
