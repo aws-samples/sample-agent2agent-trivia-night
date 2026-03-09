@@ -16,8 +16,8 @@ import urllib.request
 import boto3
 import httpx
 
-AGENT_ARN = "arn:aws:bedrock-agentcore:us-east-1:167428594774:runtime/AWSKnowledgeAgent_AWSKnowledgeAgent-BX0UHYDi7h"
-
+# Update with your AgentCore Runtime ARN
+AGENT_ARN = "arn:aws:bedrock-agentcore:XXX:YYY:runtime/ZZZ"
 
 # --- Token helpers ---
 
@@ -87,7 +87,6 @@ def main():
     print(token)
 
     encoded_arn = AGENT_ARN.replace(":", "%3A").replace("/", "%2F")
-    encoded_arn = "arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3A167428594774%3Aruntime%2FAWSKnowledgeAgent_AWSKnowledgeAgent-1x3TxP57lk"
     region = AGENT_ARN.split(":")[3]
     mcp_url = f"https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{encoded_arn}/invocations?qualifier=DEFAULT"
 
