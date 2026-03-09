@@ -1,12 +1,12 @@
 import boto3
 import json
 from botocore.exceptions import ClientError
+import os
 
 # Initialize the Bedrock AgentCore client
-client = boto3.client("bedrock-agentcore")
+client = boto3.client("bedrock-agentcore", region_name=os.getenv('AWS_REGION', 'us-east-1'))
 # Update with your AgentCore Runtime ARN
 runtime_arn = "arn:aws:bedrock-agentcore:XXX:YYY:runtime/ZZZ"
-
 
 def call_mcp(method, params=None):
     """
