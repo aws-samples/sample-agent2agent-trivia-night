@@ -1,0 +1,18 @@
+{
+  "name": "AWSKnowledgeAgent",
+  "version": 1,
+  "agents": [
+    {
+      "type": "AgentCoreRuntime",
+      "name": "AWSKnowledgeAgent",
+      "build": "Container",
+      "entrypoint": "main.py",
+      "codeLocation": "app/AWSKnowledgeAgent/",
+      "runtimeVersion": "PYTHON_3_12",
+      "networkMode": "PUBLIC",
+      "modelProvider": "Bedrock"
+    }
+  ],
+  "memories": [],
+  "credentials": []
+}
