@@ -1,69 +1,85 @@
-import boto3
+"""
+Test MCP server hosted on AgentCore Runtime using streamable HTTP transport.
+Fetches a Cognito M2M bearer token and uses it to authenticate requests.
+
+Usage:
+    python scripts/test_mcp.py [--pool-name CognitoUserPool] [--region us-east-1]
+"""
+
+import argparse
+import asyncio
+import base64
 import json
-from botocore.exceptions import ClientError
 import os
+import sys
+import urllib.request
 
-# Initialize the Bedrock AgentCore client
-client = boto3.client("bedrock-agentcore", region_name=os.getenv('AWS_REGION', 'us-east-1'))
-# Update with your AgentCore Runtime ARN
-runtime_arn = "arn:aws:bedrock-agentcore:XXX:YYY:runtime/ZZZ"
+import boto3
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
 
-def call_mcp(method, params=None):
-    """
-    Call an MCP method on the agent runtime.
+from get_m2m_token import (
+    get_ssm_param,
+    get_m2m_client_secret,
+    fetch_token,
+    get_m2m_bearer_token,
+)
 
-    Args:
-        method: The MCP method to call (e.g., 'tools/list', 'tools/call')
-        params: Optional parameters for the method
+AWS_KNOWLEDGE_AGENT_ARN = os.getenv("AWS_KNOWLEDGE_AGENT_ARN")
 
-    Returns:
-        The result from the MCP response
-    """
-    if params is None:
-        params = {}
 
-    payload = json.dumps(
-        {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
-    ).encode()
+async def run(bearer_token: str):
+    encoded_arn = AWS_KNOWLEDGE_AGENT_ARN.replace(":", "%3A").replace("/", "%2F")
+    region = AWS_KNOWLEDGE_AGENT_ARN.split(":")[3]
+    mcp_url = f"https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{encoded_arn}/invocations?qualifier=DEFAULT"
+    headers = {
+        "authorization": f"Bearer {bearer_token}",
+        "Content-Type": "application/json",
+    }
 
-    try:
-        response = client.invoke_agent_runtime(
-            agentRuntimeArn=runtime_arn,
-            payload=payload,
-            qualifier="DEFAULT",
-            contentType="application/json",
-            accept="application/json, text/event-stream",
-        )
+    print(f"Connecting to: {mcp_url}\n")
 
-        raw = response["response"].read().decode()
-        json_data = json.loads(raw[raw.find("{") :])
-        return json_data["result"]
+    async with streamablehttp_client(
+        mcp_url, headers, timeout=120, terminate_on_close=False
+    ) as (
+        read_stream,
+        write_stream,
+        _,
+    ):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
 
-    except ClientError as e:
-        print(f"\n{'=' * 60}")
-        print("Error Response:")
-        print(json.dumps(e.response, indent=2, default=str))
-        print(f"{'=' * 60}\n")
-        raise
+            # List tools
+            print("=== Available Tools ===")
+            tools_result = await session.list_tools()
+            for tool in tools_result.tools:
+                print(f"  {tool.name}: {tool.description}")
+            print()
+
+            # Call invoke tool
+            print("invoke('Tell me about Bedrock AgentCore')")
+            result = await session.call_tool(
+                "invoke",
+                {"request": "Tell me about Bedrock AgentCore"},
+            )
+            print(result.content[0].text)
 
 
 def main():
-    # List available tools
-    print("=== Available Tools ===")
-    tools_result = call_mcp("tools/list")
-    for tool in tools_result["tools"]:
-        print(f"  {tool['name']}: {tool['description']}")
-    print()
+    parser = argparse.ArgumentParser(description="Test AgentCore MCP server with OAuth")
+    parser.add_argument("--pool-name", default="CognitoUserPool")
+    parser.add_argument("--region", default=os.getenv("AWS_REGION", "us-east-1"))
+    args = parser.parse_args()
 
-    # Example: Call invoke tool
-    print("invoke('Tell me about Bedrock AgentCore')")
-    result = call_mcp(
-        "tools/call",
-        {"name": "invoke", "arguments": {"request": "Tell me about Bedrock AgentCore"}},
-    )
+    print("=== Fetching Bearer Token ===")
+    try:
+        token = get_m2m_bearer_token(args.pool_name, args.region)
+    except Exception as e:
+        print(f"ERROR: Failed to fetch token: {e}", file=sys.stderr)
+        sys.exit(1)
+    print("Token acquired.\n")
 
-    print(result["content"][0]["text"])
-    print()
+    asyncio.run(run(token))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,0 @@
-bedrock-agentcore
-strands-agents
-strands-agents-tools
-mcp>=1.0.0
-from strands.tools.mcp import MCPClient
-PyJWT

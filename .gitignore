@@ -7,3 +7,4 @@ __pycache__
 agents/AWSKnowledgeAgent-base
 agents/myMCPServer
 aws-targets.json
+.DS_Store

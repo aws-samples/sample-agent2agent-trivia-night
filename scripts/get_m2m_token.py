@@ -46,9 +46,21 @@ def fetch_token(token_endpoint: str, client_id: str, client_secret: str) -> str:
         return json.loads(resp.read().decode())["access_token"]
 
 
+def get_m2m_bearer_token(pool_name: str, region: str) -> str:
+    ssm = boto3.client("ssm", region_name=region)
+    prefix = f"/{pool_name}/m2m"
+    user_pool_id = get_ssm_param(ssm, f"{prefix}/user-pool-id")
+    client_id = get_ssm_param(ssm, f"{prefix}/client-id")
+    token_endpoint = get_ssm_param(ssm, f"{prefix}/token-endpoint")
+    client_secret = get_m2m_client_secret(user_pool_id, client_id, region)
+    return fetch_token(token_endpoint, client_id, client_secret)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Get a Cognito M2M bearer token")
-    parser.add_argument("--pool-name", default="CognitoUserPool", help="Cognito pool name (SSM prefix)")
+    parser.add_argument(
+        "--pool-name", default="CognitoUserPool", help="Cognito pool name (SSM prefix)"
+    )
     parser.add_argument("--region", default="us-east-1", help="AWS region")
     args = parser.parse_args()
 
