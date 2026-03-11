@@ -1,16 +1,9 @@
-"""
-AWS Knowledge Agent using Strands + AgentCore Runtime
-Connects to the AWS Knowledge MCP Server via Streamable HTTP transport.
-Wrapped with mcp.tool() to provide an MCP server for Agent-as-tool orchestration pattern
-"""
-
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.server.fastmcp import FastMCP
 from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 
-# AWS Knowledge MCP Server via Streamable HTTP
 aws_knowledge_client = MCPClient(
     lambda: streamablehttp_client("https://knowledge-mcp.global.api.aws"),
     tool_filters={
@@ -36,7 +29,6 @@ mcp = FastMCP(
     port=8000,
 )
 
-
 @mcp.tool()
 def invoke(request: str = "Hello"):
     """
@@ -56,20 +48,5 @@ def invoke(request: str = "Hello"):
         if "text" in content
     ]
 
-
 if __name__ == "__main__":
     mcp.run(transport="streamable-http")
-
-# Uncomment to test locally using MCP inspector
-# npx @modelcontextprotocol/inspector 
-# if __name__ == "__main__":
-#     import uvicorn
-#     from starlette.middleware.cors import CORSMiddleware
-#     app = mcp.streamable_http_app()
-#     app.add_middleware(
-#         CORSMiddleware,
-#         allow_origins=["*"],
-#         allow_methods=["*"],
-#         allow_headers=["*"],
-#     )
-#     uvicorn.run(app, host="0.0.0.0", port=8000)

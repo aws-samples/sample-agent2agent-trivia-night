@@ -14,11 +14,17 @@ Wrapped with BedrockAgentCoreApp for deployment to AgentCore Runtime.
 
 ```bash
 echo
-export COGNITO_DISCOVERY_URL="https://cognito-idp.$AWS_REGION.amazonaws.com/$(aws ssm get-parameter --name '/CognitoUserPool/m2m/user-pool-id' --query 'Parameter.Value' --output text)/.well-known/openid-configuration"
+export COGNITO_DISCOVERY_URL=$(aws ssm get-parameters \
+  --names /Workshop/platform/cognito_discovery_url \
+  --query "Parameters[*].Value" \
+  --output text)
 echo -e "Discovery URL:\n$COGNITO_DISCOVERY_URL"
 echo
-export COGNITO_CLIENT_ID=$(aws ssm get-parameter --name "/CognitoUserPool/m2m/client-id" --query "Parameter.Value" --output text)
-echo -e "Client ID:\n$COGNITO_CLIENT_ID"
+export COGNITO_M2M_CLIENT_ID=$(aws ssm get-parameters \
+  --names /Workshop/platform/m2m_client_id \
+  --query "Parameters[*].Value" \
+  --output text)
+echo -e "Client ID:\n$COGNITO_M2M_CLIENT_ID"
 echo
 ```
 
@@ -32,7 +38,7 @@ uv run agentcore configure \
 -rt PYTHON_3_13 \
 -rf requirements.txt \
 -do -dm -p MCP -r $AWS_REGION \
---authorizer-config "{\"customJWTAuthorizer\": {\"discoveryUrl\": \"$COGNITO_DISCOVERY_URL\", \"allowedClients\": [\"$COGNITO_CLIENT_ID\"]}}"
+--authorizer-config "{\"customJWTAuthorizer\": {\"discoveryUrl\": \"$COGNITO_DISCOVERY_URL\", \"allowedClients\": [\"$COGNITO_M2M_CLIENT_ID\"]}}"
 ```
 
 1. Deploy agent by running `uv run agentcore deploy`.
