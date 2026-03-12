@@ -22,6 +22,10 @@ def get_ssm_param(ssm, path: str) -> str:
     return ssm.get_parameter(Name=path)["Parameter"]["Value"]
 
 
+def get_encrypted_ssm_param(ssm, path: str) -> str:
+    return ssm.get_parameter(Name=path, WithDecryption=True)["Parameter"]["Value"]
+
+
 def get_m2m_client_secret(user_pool_id: str, client_id: str, region: str) -> str:
     cognito = boto3.client("cognito-idp", region_name=region)
     response = cognito.describe_user_pool_client(
@@ -46,13 +50,12 @@ def fetch_token(token_endpoint: str, client_id: str, client_secret: str) -> str:
         return json.loads(resp.read().decode())["access_token"]
 
 
-def get_m2m_bearer_token(pool_name: str, region: str) -> str:
-    ssm = boto3.client("ssm", region_name=region)
-    prefix = f"/{pool_name}/m2m"
-    user_pool_id = get_ssm_param(ssm, f"{prefix}/user-pool-id")
-    client_id = get_ssm_param(ssm, f"{prefix}/client-id")
-    token_endpoint = get_ssm_param(ssm, f"{prefix}/token-endpoint")
-    client_secret = get_m2m_client_secret(user_pool_id, client_id, region)
+def get_m2m_bearer_token(
+    client_id: str, client_secret: str, user_pool_domain: str, region: str
+) -> str:
+    token_endpoint = (
+        f"https://{user_pool_domain}.auth.{region}.amazoncognito.com/oauth2/token"
+    )
     return fetch_token(token_endpoint, client_id, client_secret)
 
 
@@ -61,29 +64,42 @@ def main():
     parser.add_argument(
         "--pool-name", default="CognitoUserPool", help="Cognito pool name (SSM prefix)"
     )
+    parser.add_argument(
+        "--ssm-prefix",
+        default="/Workshop/platform",
+        help="SSM prefix (must start with /)",
+    )
     parser.add_argument("--region", default="us-east-1", help="AWS region")
     args = parser.parse_args()
-
     ssm = boto3.client("ssm", region_name=args.region)
-    prefix = f"/{args.pool_name}/m2m"
+
+    print("=== Fetching Parameters ===")
 
     try:
-        user_pool_id = get_ssm_param(ssm, f"{prefix}/user-pool-id")
-        client_id = get_ssm_param(ssm, f"{prefix}/client-id")
-        token_endpoint = get_ssm_param(ssm, f"{prefix}/token-endpoint")
+        client_id = get_ssm_param(ssm, f"{args.ssm_prefix}/m2m_client_id")
+        client_secret = get_encrypted_ssm_param(
+            ssm, f"{args.ssm_prefix}/m2m_client_secret"
+        )
+        discovery_url = get_ssm_param(ssm, f"{args.ssm_prefix}/cognito_discovery_url")
+        user_pool_domain = get_ssm_param(ssm, f"{args.ssm_prefix}/user_pool_domain")
     except Exception as e:
         print(f"ERROR: Failed to read SSM parameters: {e}", file=sys.stderr)
         sys.exit(1)
 
-    client_secret = get_m2m_client_secret(user_pool_id, client_id, args.region)
-    discovery_url = f"https://cognito-idp.{args.region}.amazonaws.com/{user_pool_id}/.well-known/openid-configuration"
-    access_token = fetch_token(token_endpoint, client_id, client_secret)
+    print("=== Fetching Bearer Token ===")
+    try:
+        token = get_m2m_bearer_token(
+            client_id, client_secret, user_pool_domain, args.region
+        )
+    except Exception as e:
+        print(f"ERROR: Failed to fetch token: {e}", file=sys.stderr)
+        sys.exit(1)
+    print("Token acquired.\n")
 
     print(f"Discovery URL:  {discovery_url}")
-    print(f"Token URL:      {token_endpoint}")
     print(f"Client ID:      {client_id}")
     print(f"Client Secret:  {client_secret}")
-    print(f"Access Token:   {access_token}")
+    print(f"Access Token:   {token}")
 
 
 if __name__ == "__main__":

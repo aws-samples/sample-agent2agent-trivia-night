@@ -1,3 +1,5 @@
 strands-agents[a2a]
 bedrock-agentcore
 strands-agents-tools
+uvicorn
+fastapi
