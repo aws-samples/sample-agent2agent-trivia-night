@@ -1,0 +1,2 @@
+# Runtime dependencies (installed into Lambda package by deploy.sh)
+boto3>=1.35.0
