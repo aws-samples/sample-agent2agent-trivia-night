@@ -8,11 +8,6 @@ from fastapi import FastAPI
 
 logging.basicConfig(level=logging.INFO)
 
-# Use the complete runtime URL from environment variable, fallback to local
-runtime_url = os.environ.get("AGENTCORE_RUNTIME_URL", "http://127.0.0.1:9000/")
-
-logging.info(f"Runtime URL: {runtime_url}")
-
 strands_agent = Agent(
     name="Calculator Agent",
     description="A calculator agent that can perform basic arithmetic operations.",
@@ -20,6 +15,11 @@ strands_agent = Agent(
     callback_handler=None,
 )
 
+### A2A Server Content ###
+#  
+# Use the complete runtime URL from environment variable, fallback to local
+runtime_url = os.environ.get("AGENTCORE_RUNTIME_URL", "http://127.0.0.1:9000/")
+logging.info(f"Runtime URL: {runtime_url}")
 host, port = "0.0.0.0", 9000
 
 # Pass runtime_url to http_url parameter AND use serve_at_root=True

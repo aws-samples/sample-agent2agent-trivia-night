@@ -1,0 +1,37 @@
+{
+    "capabilities": {
+        "streaming": true
+    },
+    "defaultInputModes": [
+        "text"
+    ],
+    "defaultOutputModes": [
+        "text"
+    ],
+    "description": "A deep research agent for generating technical surveys of life science topics based on research from PubMed Central.",
+    "name": "Strands Agents",
+    "preferredTransport": "JSONRPC",
+    "protocolVersion": "0.3.0",
+    "skills": [
+        {
+            "description": "Editor tool designed to do changes iteratively on multiple files.\n\nThis tool provides a comprehensive interface for file operations, including viewing,\ncreating, modifying, and searching files with rich output formatting. It features\nsyntax highlighting, smart line finding, and automatic backups for safety.\n\nIMPORTANT ERROR PREVENTION:\n1. Required Parameters:\n   • file_text: REQUIRED for 'create' command - content of file to create\n   • search_text: REQUIRED for 'find_line' command - text to search\n   • insert command: BOTH new_str AND insert_line REQUIRED\n\n2. Command-Specific Requirements:\n   • create: Must provide file_text, file_text is required for create command\n   • str_replace: Both old_str and new_str are required for str_replace command\n   • pattern_replace: Both pattern and new_str required\n   • insert: Both new_str and insert_line required\n   • find_line: search_text required\n\n3. Path Handling:\n   • Use absolute paths (e.g., /Users/name/file.txt)\n   • Or user-relative paths (~/folder/file.txt)\n   • Ensure parent directories exist for create command\n\nCommand Details:\n--------------\n1. view:\n   • Displays file content with syntax highlighting\n   • Shows directory structure for directory paths\n   • Supports viewing specific line ranges with view_range\n\n2. create:\n   • Creates new files with specified content\n   • Creates parent directories if they don't exist\n   • Caches content for subsequent operations\n\n3. str_replace:\n   • Replaces exact string matches in a file\n   • Creates automatic backup before modification\n   • Returns details about number of replacements\n\n4. pattern_replace:\n   • Uses regex patterns for advanced text replacement\n   • Validates patterns before execution\n   • Creates automatic backup before modification\n\n5. insert:\n   • Inserts text after a specified line\n   • Supports finding insertion points by line number or search text\n   • Shows context around insertion point\n\n6. find_line:\n   • Finds line numbers matching search text\n   • Supports fuzzy matching for flexible searches\n   • Shows context around found line\n\n7. undo_edit:\n   • Reverts to the most recent backup\n   • Removes the backup file after restoration\n   • Updates content cache with restored version\n\nSmart Features:\n------------\n• Content caching improves performance by reducing file reads\n• Fuzzy search allows finding lines with approximate matches\n• Automatic backups before modifications ensure safety\n• Rich output formatting enhances readability of results\n\nReturns:\n    Dict containing status and response content in the format:\n    {\n        \"status\": \"success|error\",\n        \"content\": [{\"text\": \"Response message\"}]\n    }\n\n    Success case: Returns details about the operation performed\n    Error case: Returns information about what went wrong\n\nExamples:\n    1. View a file:\n       editor(command=\"view\", path=\"/path/to/file.py\")\n\n    2. Create a new file:\n       editor(command=\"create\", path=\"/path/to/file.txt\", file_text=\"Hello World\")\n\n    3. Replace text:\n       editor(command=\"str_replace\", path=\"/path/to/file.py\", old_str=\"old\", new_str=\"new\")\n\n    4. Insert after line 10:\n       editor(command=\"insert\", path=\"/path/to/file.py\", insert_line=10, new_str=\"# New line\")\n\n    5. Insert after a specific text:\n       editor(command=\"insert\", path=\"/path/to/file.py\", insert_line=\"def main\", new_str=\"    # Comment\")\n\n    6. Find a line containing text:\n       editor(command=\"find_line\", path=\"/path/to/file.py\", search_text=\"import os\")\n\n    7. Undo recent change:\n       editor(command=\"undo_edit\", path=\"/path/to/file.py\")",
+            "id": "editor",
+            "name": "editor",
+            "tags": []
+        },
+        {
+            "description": "Search PubMed Central (PMC) for scientific articles with citation analysis and reranking.\n\nThis tool performs comprehensive literature searches across PMC with optional citation\nanalysis. Results can be ranked by how frequently they are cited within the result set,\nhelping surface the most influential papers. Perfect for research, literature reviews,\nand finding authoritative sources on scientific topics.\n\nReturns:\n    Dictionary with status and content:\n    - status: \"success\" or \"error\"\n    - content: List with single dict containing \"text\" field with formatted results\n        including article titles, authors, abstracts, DOIs, and citation counts\n\nExamples:\n    Basic search:\n        search_pmc_tool(\"machine learning in healthcare\")\n\n    Search with recent date filter:\n        search_pmc_tool(\"mRNA vaccine COVID-19 AND last 2 years[dp]\", rerank_by=None)\n\n    Search with specific date range:\n        search_pmc_tool(\"CRISPR gene editing AND 2020:2023[dp]\")\n\n    Search by author and date:\n        search_pmc_tool(\"Smith J[au] AND cancer AND 2022/01/01:2024/12/31[dp]\")\n\n    Search by journal and recent articles:\n        search_pmc_tool(\"Nature[journal] AND last 6 months[dp]\", rerank_by=None)",
+            "id": "search_pmc_tool",
+            "name": "search_pmc_tool",
+            "tags": []
+        },
+        {
+            "description": "Answer questions about a PMC article using paper-qa for intelligent retrieval.\n\nThis tool downloads a scientific paper from PubMed Central and uses the paper-qa\nlibrary to answer specific questions about the paper with source.\n\nReturns:\n    dict: ToolResult with status and content containing the answer and source",
+            "id": "gather_evidence_tool",
+            "name": "gather_evidence_tool",
+            "tags": []
+        }
+    ],
+    "url": "http://127.0.0.1:9000/",
+    "version": "0.0.1"
+}

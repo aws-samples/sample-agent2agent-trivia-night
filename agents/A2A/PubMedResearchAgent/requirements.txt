@@ -1,7 +1,7 @@
 boto3 
 defusedxml 
 httpx
-strands-agents
+strands-agents[a2a]
 strands-agents-tools
 bedrock_agentcore
 paper-qa

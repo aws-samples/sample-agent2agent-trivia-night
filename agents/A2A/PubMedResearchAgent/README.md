@@ -29,3 +29,42 @@ Sources
 - [uv](https://docs.astral.sh/uv/) package manager
 - AWS CLI configured with appropriate credentials
 - Access to Amazon Bedrock AgentCore
+
+## Testing
+
+1. uv add -r requirements.txt
+2. uv run main.py
+3. In a seperate terminal session run `curl http://localhost:9000/.well-known/agent-card.json | jq .` to get the agent card.
+4. Next, run the following command to test the agent invokation.
+
+```bash
+curl -X POST http://localhost:9000/ \
+-H "Content-Type: application/json" \
+-d '{
+  "jsonrpc": "2.0",
+  "id": "req-001",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "what are recent advances in GLP-1 drugs?"
+        }
+      ],
+      "messageId": "12345678-1234-1234-1234-123456789012"
+    }
+  }
+}' | jq .
+```
+
+## Deployment
+
+1. Run `uv run agentcore configure -e main.py --protocol A2A` and configure the authorizer, memory, and other settings.
+2. run `uv run agentcore deploy` to upload the agent code and deploy to AgentCore Runtime.
+3. Run `export AGENT_ARN=<Access Token Value from previous step>`
+4. Run `uv run ../../../scripts/get_m2m_token.py`
+5. Run `export BEARER_TOKEN=<Access Token Value from previous step>`
+6. Run `uv run ../../../scripts/get_agent_card.py`
+
