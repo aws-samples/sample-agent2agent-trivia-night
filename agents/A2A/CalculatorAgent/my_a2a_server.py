@@ -27,6 +27,7 @@ a2a_server = A2AServer(
     agent=strands_agent,
     http_url=runtime_url,
     serve_at_root=True,  # Serves locally at root (/) regardless of remote URL path complexity
+    enable_a2a_compliant_streaming=True
 )
 
 app = FastAPI()
@@ -35,6 +36,12 @@ app = FastAPI()
 @app.get("/ping")
 def ping():
     return {"status": "healthy"}
+
+
+# AgentCore Runtime proxies GET requests as POST, so handle both
+@app.post("/.well-known/agent-card.json")
+def agent_card_post():
+    return a2a_server.public_agent_card
 
 
 app.mount("/", a2a_server.to_fastapi_app())

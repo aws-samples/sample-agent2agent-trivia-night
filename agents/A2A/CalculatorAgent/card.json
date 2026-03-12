@@ -1,0 +1,25 @@
+{
+    "capabilities": {
+        "streaming": true
+    },
+    "defaultInputModes": [
+        "text"
+    ],
+    "defaultOutputModes": [
+        "text"
+    ],
+    "description": "A calculator agent that can perform basic arithmetic operations.",
+    "name": "Calculator Agent",
+    "preferredTransport": "JSONRPC",
+    "protocolVersion": "0.3.0",
+    "skills": [
+        {
+            "description": "Calculator powered by SymPy for comprehensive mathematical operations.\n\nThis tool provides advanced mathematical functionality through multiple operation modes,\nincluding expression evaluation, equation solving, calculus operations (derivatives, integrals),\nlimits, series expansions, and matrix operations. Results are formatted with appropriate\nprecision and can be displayed in scientific notation when needed.\n\nHow It Works:\n------------\n1. The function parses the mathematical expression using SymPy's parser\n2. Based on the selected mode, it routes the expression to the appropriate handler\n3. Variables and constants are substituted with their values when provided\n4. The expression is evaluated symbolically and/or numerically as appropriate\n5. Results are formatted based on precision preferences and value magnitude\n6. Rich output is generated with operation details and formatted results\n\nOperation Modes:\n--------------\n- evaluate: Calculate the value of a mathematical expression\n- solve: Find solutions to an equation or system of equations\n- derive: Calculate derivatives of an expression\n- integrate: Find the indefinite integral of an expression\n- limit: Evaluate the limit of an expression at a point\n- series: Generate series expansion of an expression\n- matrix: Perform matrix operations\n\nCommon Usage Scenarios:\n---------------------\n- Basic calculations: Evaluating arithmetic expressions\n- Equation solving: Finding roots of polynomials or systems of equations\n- Calculus: Computing derivatives and integrals for analysis\n- Engineering analysis: Working with scientific notations and constants\n- Mathematics education: Visualizing step-by-step solutions\n- Data science: Matrix operations and statistical calculations\n\nReturns:\n    Dict containing status and response content in the format:\n    {\n        \"status\": \"success|error\",\n        \"content\": [{\"text\": \"Result: <calculated_result>\"}]\n    }\n\n    Success case: Returns the calculation result with appropriate formatting\n    Error case: Returns information about what went wrong during calculation\n\nNotes:\n    - For equation solving, set the expression equal to zero implicitly (x**2 + 1 means x**2 + 1 = 0)\n    - Use 'pi' and 'e' for mathematical constants\n    - The 'wrt' parameter is required for differentiation and integration\n    - Matrix expressions use Python-like syntax: [[1, 2], [3, 4]]\n    - Precision control impacts display only, internal calculations use higher precision\n    - Symbolic results are returned when possible unless force_numeric=True",
+            "id": "calculator",
+            "name": "calculator",
+            "tags": []
+        }
+    ],
+    "url": "https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3A167428594774%3Aruntime%2FCalculatorAgent-ERpcVKEEsY/invocations/",
+    "version": "0.0.1"
+}
