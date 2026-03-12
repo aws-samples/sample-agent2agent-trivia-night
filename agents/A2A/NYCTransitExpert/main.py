@@ -5,7 +5,8 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp.mcp_client import MCPClient
 
-MCP_ENDPOINT = "https://subwayinfo.nyc/mcp"
+# MCP_ENDPOINT = "https://subwayinfo.nyc/mcp"
+MCP_ENDPOINT = "https://mcp.platform.opentargets.org/mcp"
 MODEL_ID = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
 REGION = os.getenv("AWS_REGION")
 
