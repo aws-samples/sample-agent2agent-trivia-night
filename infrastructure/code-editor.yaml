@@ -821,6 +821,113 @@ Resources:
               documentParameters:
                 ExtensionId: synedra.auto-run-command
                 CodeEditorUser: !Ref CodeEditorUser
+  # Install optional packages here
+          - name: InstallPythonDnf
+            # AL2023 currently ships with Python 3.9 preinstalled, but 3.13 is available in the repository
+            action: aws:runShellScript
+            precondition:
+              StringEquals:
+                - '{{ LinuxFlavor }}'
+                - al2023
+            inputs:
+              timeoutSeconds: 300
+              runCommand:
+                - '#!/bin/bash'
+                # - set -euo pipefail # Uncomment to throw error on failure
+                - dnf install -y python3.13 python3.13-pip python3-virtualenv python3-pytest python3-boto3
+                - !Sub echo 'alias python3=python3.13' >> /home/${CodeEditorUser}/.bashrc
+                - !Sub echo 'alias pip3=pip3.13' >> /home/${CodeEditorUser}/.bashrc
+                - python3.13 -m pip install --upgrade pip 2>&1
+          - name: InstallPythonApt
+            # Ubuntu 22 default is Python 3.10, Ubuntu 24 default is Python 3.12
+            action: aws:runShellScript
+            precondition:
+              StringEquals:
+                - '{{ LinuxFlavor }}'
+                - ubuntu
+            inputs:
+              timeoutSeconds: 300
+              runCommand:
+                - '#!/bin/bash'
+                # - set -euo pipefail # Uncomment to throw error on failure
+                - dpkg --configure -a
+                - apt-get -q update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q python3-pip python3-venv python3-boto3 python3-pytest
+                - systemctl start multipathd.service packagekit.service
+                - systemctl restart unattended-upgrades.service
+                - systemctl restart networkd-dispatcher.service
+          - name: ConfigurePython
+            action: aws:runShellScript
+            inputs:
+              timeoutSeconds: 300
+              runCommand:
+                - '#!/bin/bash'
+                # - set -euo pipefail # Uncomment to throw error on failure
+                - !Sub echo 'export AWS_DEFAULT_REGION=${AWS::Region}' >> /home/${CodeEditorUser}/.bashrc
+                - !Sub echo 'alias pytest=pytest-3' >> /home/${CodeEditorUser}/.bashrc
+                - !Sub |
+                    target_file="/home/${CodeEditorUser}/.code-editor-server/data/User/settings.json"
+                    if [ ! -f "$target_file" ]; then
+                      echo '{}' > "$target_file"
+                    fi
+                    echo "$(jq '. + {"python.testing.pytestEnabled": true}' "$target_file")" > "$target_file"
+                - echo "Python and Pip installed. Checking configuration"
+                - !Sub sudo -i -u ${CodeEditorUser} python3 --version
+                - !Sub sudo -i -u ${CodeEditorUser} pip3 --version  
+          - name: Installuv
+            action: aws:runShellScript
+            inputs:
+              timeoutSeconds: 600
+              runCommand:
+                - '#!/bin/bash'
+                # - set -euo pipefail # Uncomment to throw error on failure
+                - !Sub sudo -u ${CodeEditorUser} curl -fsSL https://astral.sh/uv/install.sh -o /tmp/uv_install.sh
+                - !Sub sudo -i -u ${CodeEditorUser} bash /tmp/uv_install.sh 2>&1
+                - !Sub |
+                    if uv generate-shell-completion bash &>/dev/null; then
+                      echo 'eval "$(uv generate-shell-completion bash)"' >> /home/${CodeEditorUser}/.bashrc
+                    fi
+                - !Sub |
+                    if uvx generate-shell-completion bash &>/dev/null; then
+                      echo 'eval "$(uvx generate-shell-completion bash)"' >> /home/${CodeEditorUser}/.bashrc
+                    fi
+                - echo "uv installed. Checking configuration"
+                - !Sub sudo -i -u ${CodeEditorUser} uv --version
+          - name: InstallNodeDnf
+            action: aws:runShellScript
+            precondition:
+              StringEquals:
+                - '{{ LinuxFlavor }}'
+                - al2023
+            inputs:
+              timeoutSeconds: 300
+              runCommand:
+                - '#!/bin/bash'
+                # - set -euo pipefail # Uncomment to throw error on failure
+                - curl -fsSL https://rpm.nodesource.com/setup_24.x | bash -
+                - dnf install -y nodejs
+                - npm install -g npm@latest
+                - echo "Node and npm installed. Checking configuration"
+                - node -v
+                - npm -v
+          - name: InstallNodeApt
+            action: aws:runShellScript
+            precondition:
+              StringEquals:
+                - '{{ LinuxFlavor }}'
+                - ubuntu
+            inputs:
+              timeoutSeconds: 300
+              runCommand:
+                - '#!/bin/bash'
+                # - set -euo pipefail # Uncomment to throw error on failure
+                - curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
+                - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
+                - apt-get -q update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q nodejs
+                - npm install -g npm@latest
+                - echo "Node and npm installed. Checking configuration"
+                - node -v
+                - npm -v
+  # Install Workshop specific packages here
           - name: InstallKiroCLI
             action: aws:runShellScript
             inputs:
@@ -832,8 +939,74 @@ Resources:
                 - !Sub sudo -u ${CodeEditorUser} bash /tmp/kiro_cli_install.sh 2>&1
                 - echo "Kiro CLI installed. Checking configuration"
                 - !Sub sudo -i -u ${CodeEditorUser} kiro-cli --version
-  # Install optional packages here
-  # Install Workshop specific packages here
+          - name: InstallKiroCLIMCPConfig
+            action: aws:runShellScript
+            inputs:
+              timeoutSeconds: 300
+              runCommand:
+                - "#!/bin/bash"
+                # - set -euo pipefail # Uncomment to throw error on failure
+                - !Sub |
+                  sudo -i -u ${CodeEditorUser} mkdir -p ${HomeFolder}/.kiro/settings
+                  sudo -i -u ${CodeEditorUser} tee ${HomeFolder}/.kiro/settings/mcp.json <<'EOF'
+                  {
+                      "mcpServers": {
+                          "bedrock-agentcore-mcp-server": {
+                              "command": "uvx",
+                              "args": [
+                                  "awslabs.amazon-bedrock-agentcore-mcp-server@latest"
+                              ],
+                              "disabled": false,
+                              "env": {
+                                  "FASTMCP_LOG_LEVEL": "ERROR"
+                              },
+                              "autoApprove": [
+                                  "search_agentcore_docs",
+                                  "fetch_agentcore_doc"
+                              ]
+                          },
+                          "aws-knowledge-mcp-server": {
+                              "command": "npx",
+                              "args": [
+                                  "mcp-remote",
+                                  "https://knowledge-mcp.global.api.aws"
+                              ],
+                              "disabled": false,
+                              "autoApprove": [
+                                  "aws___search_documentation",
+                                  "aws___read_documentation"
+                              ]
+                          },
+                          "strands-agents-mcp-server": {
+                              "command": "uvx",
+                              "args": [
+                                  "strands-agents-mcp-server"
+                              ],
+                              "disabled": false,
+                              "env": {
+                                  "FASTMCP_LOG_LEVEL": "INFO"
+                              },
+                              "autoApprove": [
+                                  "search_docs",
+                                  "fetch_doc"
+                              ]
+                          }
+                      }
+                  }
+                  EOF
+                  chown -R ${CodeEditorUser}:${CodeEditorUser} ${HomeFolder}/.kiro
+                - echo "Kiro CLI MCP config installed. Checking configuration"
+                - !Sub cat ${HomeFolder}/.kiro/settings/mcp.json
+          - name: InstallAgentCoreCLI
+            action: aws:runShellScript
+            inputs:
+              timeoutSeconds: 300
+              runCommand:
+                - "#!/bin/bash"
+                # - set -euo pipefail # Uncomment to throw error on failure
+                - pip install bedrock-agentcore strands-agents bedrock-agentcore-starter-toolkit mcp>=1.0.0 "chardet<6.0.0"
+                - echo "AgentCore CLI installed. Checking configuration"
+                - agentcore --help
 
   SSMDocLambdaRole:
     Type: AWS::IAM::Role
@@ -1440,7 +1613,7 @@ Resources:
       DocumentName: !Ref CodeEditorSSMDoc
 
 Outputs:
-  URL:
+  CodeEditorURL:
     Description: Code Editor URL
     Value: !Sub https://${CloudFrontDistribution.DomainName}/?folder=${HomeFolder}&tkn=${SecretPlaintext.password}
   CodeEditorInstanceBootstrapRoleArn:

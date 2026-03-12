@@ -1,0 +1,1431 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  LSS Workshop Platform Stack - API backend (S3 Vectors, Lambda, API Gateway),
+  Web UI frontend (S3, CloudFront, Cognito), CodeBuild pipelines, and custom resources.
+  Replaces the CDK-based ApiStack and WebUiStack.
+
+Parameters:
+  StackPrefix:
+    Type: String
+    Default: Workshop
+    Description: Cross-stack naming prefix for consistency with existing workshop templates
+  AssetsBucketName:
+    Type: String
+    Description: Workshop Studio assets S3 bucket name
+  AssetsBucketPrefix:
+    Type: String
+    Description: Workshop Studio assets S3 bucket prefix
+
+Resources:
+  # ===========================================================================
+  # Task 1: API Backend Resources
+  # ===========================================================================
+
+  # 1.2 - S3 Vectors Bucket
+  VectorBucket:
+    Type: AWS::S3Vectors::VectorBucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      VectorBucketName: !Sub "lss-vec-${AWS::AccountId}-${AWS::Region}"
+      EncryptionConfiguration:
+        SseType: AES256
+
+  # 1.3 - Vector Index
+  VectorIndex:
+    Type: AWS::S3Vectors::Index
+    DependsOn: VectorBucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      VectorBucketName: !Sub "lss-vec-${AWS::AccountId}-${AWS::Region}"
+      IndexName: "agent-embeddings"
+      DataType: float32
+      Dimension: 1024
+      DistanceMetric: cosine
+      MetadataConfiguration:
+        NonFilterableMetadataKeys:
+          - "raw_agent_card"
+
+  # 1.4 - Lambda IAM Role
+  ApiLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub lambda.${AWS::URLSuffix}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudWatchLogs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-api:*"
+        - PolicyName: BedrockAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v2:0"
+        - PolicyName: S3VectorsAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3vectors:GetVectorBucket
+                  - s3vectors:ListIndexes
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3vectors:${AWS::Region}:${AWS::AccountId}:bucket/lss-vec-${AWS::AccountId}-${AWS::Region}"
+              - Effect: Allow
+                Action:
+                  - s3vectors:GetIndex
+                  - s3vectors:PutVectors
+                  - s3vectors:GetVectors
+                  - s3vectors:DeleteVectors
+                  - s3vectors:QueryVectors
+                  - s3vectors:ListVectors
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3vectors:${AWS::Region}:${AWS::AccountId}:bucket/lss-vec-${AWS::AccountId}-${AWS::Region}/index/agent-embeddings"
+        - PolicyName: AgentCoreAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock-agentcore:InvokeAgentRuntime
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:bedrock-agentcore:*:${AWS::AccountId}:runtime/*"
+        - PolicyName: STSAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sts:GetCallerIdentity
+                Resource: "*"
+
+  # 1.5 - Lambda CloudWatch Log Group
+  ApiLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-api"
+      RetentionInDays: 7
+
+  # 1.6 - Lambda Function
+  ApiLambdaFunction:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - ApiLambdaLogGroup
+      - LambdaPackagerTrigger
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: IAM role has explicit CloudWatch Logs permissions via inline policy
+          - id: W89
+            reason: Lambda does not require VPC access for this workshop
+          - id: W92
+            reason: Reserved concurrency not needed for workshop Lambda
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-api"
+      Description: LSS Workshop Platform API Lambda function
+      Runtime: python3.12
+      Handler: handler.lambda_handler
+      MemorySize: 512
+      Timeout: 60
+      Architectures:
+        - x86_64
+      Role: !GetAtt ApiLambdaRole.Arn
+      Environment:
+        Variables:
+          S3_VECTORS_BUCKET: !Sub "lss-vec-${AWS::AccountId}-${AWS::Region}"
+          S3_VECTORS_INDEX: "agent-embeddings"
+          BEDROCK_MODEL_ID: "amazon.titan-embed-text-v2:0"
+          LOG_LEVEL: "INFO"
+          CHAT_SERVICE_VERSION: "v4-sse-parse"
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: lambda.zip
+
+  # ===========================================================================
+  # Task 2: API Gateway Resources
+  # ===========================================================================
+
+  # 2.1 - REST API Gateway
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: "LSS Workshop Platform API"
+      Description: "API for managing and searching agent cards with semantic capabilities and chat"
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  # 2.1b - API Gateway Account (enables CloudWatch Logs for API Gateway)
+  ApiGatewayCloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub apigateway.${AWS::URLSuffix}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    DependsOn: ApiGateway
+    Properties:
+      CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
+
+  # 2.8 - API Gateway CloudWatch Log Group
+  ApiGatewayLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/aws/apigateway/${AWS::StackName}-api"
+      RetentionInDays: 7
+
+  # 2.8 - Request Validator
+  ApiRequestValidator:
+    Type: AWS::ApiGateway::RequestValidator
+    Properties:
+      RestApiId: !Ref ApiGateway
+      Name: lss-platform-validator
+      ValidateRequestBody: true
+      ValidateRequestParameters: true
+
+  # 2.3 - Proxy Resource {proxy+}
+  ApiProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: "{proxy+}"
+
+  # 2.3 - ANY method on proxy resource with IAM auth
+  ApiProxyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ApiProxyResource
+      HttpMethod: ANY
+      AuthorizationType: AWS_IAM
+      RequestValidatorId: !Ref ApiRequestValidator
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  # 2.4 - Root GET method with IAM auth
+  ApiRootMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !GetAtt ApiGateway.RootResourceId
+      HttpMethod: GET
+      AuthorizationType: AWS_IAM
+      RequestValidatorId: !Ref ApiRequestValidator
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  # 2.6 - CORS OPTIONS method on proxy resource
+  ApiProxyOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ApiProxyResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent,X-Amz-Content-Sha256,X-Amz-Target'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # 2.2 - API Gateway Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiProxyMethod
+      - ApiRootMethod
+      - ApiProxyOptionsMethod
+    Properties:
+      RestApiId: !Ref ApiGateway
+
+  # 2.2 - API Gateway Stage
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    DependsOn: ApiGatewayAccount
+    Properties:
+      RestApiId: !Ref ApiGateway
+      DeploymentId: !Ref ApiDeployment
+      StageName: prod
+      MethodSettings:
+        - HttpMethod: "*"
+          ResourcePath: "/*"
+          ThrottlingRateLimit: 100
+          ThrottlingBurstLimit: 200
+          MetricsEnabled: true
+          DataTraceEnabled: true
+          LoggingLevel: INFO
+      AccessLogSetting:
+        DestinationArn: !GetAtt ApiGatewayLogGroup.Arn
+        Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","caller":"$context.identity.caller","user":"$context.identity.user","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}'
+
+  # 2.5 - Lambda invoke permission for API Gateway
+  ApiLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ApiLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*"
+
+  # 2.7 - Gateway Response for 4XX errors with CORS headers
+  GatewayResponseDefault4XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResponseType: DEFAULT_4XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent,X-Amz-Content-Sha256,X-Amz-Target'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+
+  # 2.7 - Gateway Response for 5XX errors with CORS headers
+  GatewayResponseDefault5XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResponseType: DEFAULT_5XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent,X-Amz-Content-Sha256,X-Amz-Target'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+
+  # 2.9 - SSM Parameter for API URL
+  ApiUrlParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Name: !Sub "/${StackPrefix}/platform/${AWS::Region}/api-url"
+      Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.${AWS::URLSuffix}/prod/"
+      Description: LSS Workshop Platform API Gateway URL for auto-discovery
+
+  # ===========================================================================
+  # Task 3: Web UI Infrastructure Resources
+  # ===========================================================================
+
+  # 3.1 - WebUI S3 Bucket
+  WebUIBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Sub "lss-platform-webui-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # 3.1 - WebUI Bucket SSL enforcement policy
+  WebUIBucketSSLPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebUIBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: EnforceSSL
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${WebUIBucket}"
+              - !Sub "arn:${AWS::Partition}:s3:::${WebUIBucket}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+          - Sid: AllowCloudFrontOAC
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "arn:${AWS::Partition}:s3:::${WebUIBucket}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${WebUIDistribution}"
+
+  # 3.2 - CloudFront Origin Access Control
+  CloudFrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-webui-oac"
+        Description: OAC for WebUI S3 bucket
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # 3.5 - CloudFront Logs Bucket
+  CloudFrontLogsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Sub "lss-platform-cf-logs-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: true
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldLogs
+            Status: Enabled
+            ExpirationInDays: 90
+
+  # 3.5 - CloudFront Logs Bucket SSL enforcement
+  CloudFrontLogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CloudFrontLogsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: EnforceSSL
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${CloudFrontLogsBucket}"
+              - !Sub "arn:${AWS::Partition}:s3:::${CloudFrontLogsBucket}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+  # 3.3 - CloudFront Distribution
+  WebUIDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: LSS Workshop Platform Web UI Distribution
+        Enabled: true
+        DefaultRootObject: index.html
+        PriceClass: PriceClass_100
+        HttpVersion: http2and3
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+          MinimumProtocolVersion: TLSv1.2_2021
+        Logging:
+          Bucket: !GetAtt CloudFrontLogsBucket.DomainName
+          Prefix: "cloudfront-logs/"
+          IncludeCookies: false
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt WebUIBucket.RegionalDomainName
+            OriginAccessControlId: !Ref CloudFrontOAC
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 300
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 300
+
+  # ===========================================================================
+  # Task 4: Cognito Resources
+  # ===========================================================================
+
+  # 4.1 - Cognito User Pool
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      UserPoolName: lss-platform-users
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+        - Name: given_name
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+        - Name: family_name
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+
+  # 4.2 - Cognito User Pool Client
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: CognitoUserPoolDomain
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: lss-platform-web-client
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+      AllowedOAuthFlowsUserPoolClient: true
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs:
+        - !Sub "https://${WebUIDistribution.DomainName}"
+        - !Sub "https://${WebUIDistribution.DomainName}/"
+        - "http://localhost:3000"
+        - "http://localhost:3000/"
+      LogoutURLs:
+        - !Sub "https://${WebUIDistribution.DomainName}"
+        - !Sub "https://${WebUIDistribution.DomainName}/"
+        - "http://localhost:3000"
+        - "http://localhost:3000/"
+      RefreshTokenValidity: 30
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      TokenValidityUnits:
+        RefreshToken: days
+        AccessToken: hours
+        IdToken: hours
+      PreventUserExistenceErrors: ENABLED
+
+  # 4.3 - Cognito User Pool Domain
+  CognitoUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      Domain: !Sub
+        - "lss-platform-${UniqueId}"
+        - UniqueId: !Select [0, !Split ["-", !Select [2, !Split ["/", !Ref "AWS::StackId"]]]]
+
+  # 4.4 - Cognito Identity Pool
+  CognitoIdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: lss-platform-identity-pool
+      AllowUnauthenticatedIdentities: false
+      CognitoIdentityProviders:
+        - ClientId: !Ref CognitoUserPoolClient
+          ProviderName: !GetAtt CognitoUserPool.ProviderName
+
+  # 4.5 - Authenticated IAM Role for Identity Pool
+  CognitoAuthenticatedRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "cognito-identity.amazonaws.com:aud": !Ref CognitoIdentityPool
+              "ForAnyValue:StringLike":
+                "cognito-identity.amazonaws.com:amr": authenticated
+      Policies:
+        - PolicyName: LssPlatformApiAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - execute-api:Invoke
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*"
+
+  # 4.5 - Identity Pool Role Attachment
+  IdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref CognitoIdentityPool
+      Roles:
+        authenticated: !GetAtt CognitoAuthenticatedRole.Arn
+
+  # 4.6 - M2M client
+
+  # Resource server defines custom OAuth2 scopes for the M2M client
+  ResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      Identifier: !Sub "${CognitoUserPool}-api"
+      Name: lss-platform-m2m-resource-server
+      Scopes:
+        - ScopeName: "read"
+          ScopeDescription: "Read access"
+        - ScopeName: "write"
+          ScopeDescription: "Write access"
+
+  # M2M client using client_credentials flow (no user interaction)
+  M2MClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: ResourceServer
+    Properties:
+      ClientName: lss-platform-m2m-client
+      UserPoolId: !Ref CognitoUserPool
+      GenerateSecret: true
+      AllowedOAuthFlows:
+        - client_credentials
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes:
+        - !Sub "${CognitoUserPool}-api/read"
+        - !Sub "${CognitoUserPool}-api/write"      
+      SupportedIdentityProviders:
+        - COGNITO
+      PreventUserExistenceErrors: ENABLED
+
+
+  # ===========================================================================
+  # Task 5: CodeBuild Projects and Trigger Custom Resources
+  # ===========================================================================
+
+  # 5.1 - Lambda Code S3 Bucket
+  LambdaCodeBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Sub "lss-platform-lambda-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # 5.2 - CodeBuild IAM Role
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub codebuild.${AWS::URLSuffix}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodeBuildS3Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${AssetsBucketName}"
+                  - !Sub "arn:${AWS::Partition}:s3:::${AssetsBucketName}/*"
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${LambdaCodeBucket}/*"
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${WebUIBucket}"
+                  - !Sub "arn:${AWS::Partition}:s3:::${WebUIBucket}/*"
+        - PolicyName: CodeBuildLogs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*"
+        - PolicyName: CloudFrontInvalidation
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateInvalidation
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${WebUIDistribution}"
+
+  # 5.3 - Lambda Packager CodeBuild Project
+  LambdaPackagerProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AWS::StackName}-lambda-packager"
+      Description: Package Lambda code from platform.zip assets
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        EnvironmentVariables:
+          - Name: ASSETS_BUCKET
+            Value: !Ref AssetsBucketName
+          - Name: ASSETS_PREFIX
+            Value: !Ref AssetsBucketPrefix
+          - Name: LAMBDA_BUCKET
+            Value: !Ref LambdaCodeBucket
+      Source:
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                python: 3.12
+            pre_build:
+              commands:
+                - echo "Downloading platform.zip from assets bucket..."
+                - aws s3 cp s3://$ASSETS_BUCKET/${ASSETS_PREFIX}platform.zip /tmp/platform.zip
+                - unzip -o /tmp/platform.zip -d /tmp/source
+            build:
+              commands:
+                - echo "Installing Python dependencies..."
+                - cd /tmp/source/platform/lambda
+                - pip install -r requirements.txt -t src/
+                - echo "Creating Lambda zip..."
+                - cd src && zip -r /tmp/lambda.zip .
+            post_build:
+              commands:
+                - echo "Uploading Lambda zip to S3..."
+                - aws s3 cp /tmp/lambda.zip s3://$LAMBDA_BUCKET/lambda.zip
+                - echo "Lambda packaging complete."
+      TimeoutInMinutes: 15
+
+  # 5.4 - WebUI Builder CodeBuild Project
+  WebUIBuilderProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AWS::StackName}-webui-builder"
+      Description: Build React web UI from platform.zip assets
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        EnvironmentVariables:
+          - Name: ASSETS_BUCKET
+            Value: !Ref AssetsBucketName
+          - Name: ASSETS_PREFIX
+            Value: !Ref AssetsBucketPrefix
+          - Name: WEBUI_BUCKET
+            Value: !Ref WebUIBucket
+      Source:
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 20
+            pre_build:
+              commands:
+                - echo "Downloading platform.zip from assets bucket..."
+                - aws s3 cp s3://$ASSETS_BUCKET/${ASSETS_PREFIX}platform.zip /tmp/platform.zip
+                - unzip -o /tmp/platform.zip -d /tmp/source
+                - cd /tmp/source/platform/web-ui
+                - npm install
+            build:
+              commands:
+                - cd /tmp/source/platform/web-ui
+                - npm run build
+            post_build:
+              commands:
+                - echo "Syncing build output to S3..."
+                - aws s3 sync /tmp/source/platform/web-ui/build/ s3://$WEBUI_BUCKET/ --delete
+                - echo "WebUI build complete."
+      TimeoutInMinutes: 15
+
+  # 5.5 - CodeBuild Trigger Lambda Role
+  CodeBuildTriggerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub lambda.${AWS::URLSuffix}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: CodeBuildAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                Resource:
+                  - !GetAtt LambdaPackagerProject.Arn
+                  - !GetAtt WebUIBuilderProject.Arn
+
+  # 5.5 - CodeBuild Trigger Lambda
+  CodeBuildTriggerLambda:
+    Type: AWS::Lambda::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: AWSLambdaBasicExecutionRole includes CloudWatch Logs permissions
+          - id: W89
+            reason: CloudFormation custom function does not need VPC
+          - id: W92
+            reason: CloudFormation custom function does not need reserved concurrency
+    Properties:
+      Description: Trigger CodeBuild project and poll for completion
+      Handler: index.lambda_handler
+      Runtime: python3.13
+      MemorySize: 128
+      Timeout: 900
+      Architectures:
+        - arm64
+      Role: !GetAtt CodeBuildTriggerLambdaRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import logging
+          import time
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def lambda_handler(event, context):
+              logger.info(f'Event: {event}')
+              try:
+                  if event['RequestType'] == 'Delete':
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, reason='No action on delete')
+                      return
+
+                  project_name = event['ResourceProperties']['ProjectName']
+                  codebuild = boto3.client('codebuild')
+
+                  logger.info(f'Starting CodeBuild project: {project_name}')
+                  response = codebuild.start_build(projectName=project_name)
+                  build_id = response['build']['id']
+                  logger.info(f'Build started: {build_id}')
+
+                  # Poll for completion
+                  while True:
+                      time.sleep(15)
+                      remaining = context.get_remaining_time_in_millis()
+                      if remaining < 30000:
+                          logger.error('Lambda timeout approaching, build still running')
+                          cfnresponse.send(event, context, cfnresponse.FAILED, {},
+                                           reason=f'Lambda timeout. Build {build_id} still running.')
+                          return
+
+                      builds = codebuild.batch_get_builds(ids=[build_id])
+                      build = builds['builds'][0]
+                      status = build['buildStatus']
+                      logger.info(f'Build status: {status}')
+
+                      if status == 'SUCCEEDED':
+                          cfnresponse.send(event, context, cfnresponse.SUCCESS,
+                                           {'BuildId': build_id}, reason='Build succeeded')
+                          return
+                      elif status in ('FAILED', 'FAULT', 'TIMED_OUT', 'STOPPED'):
+                          reason = f'Build {status}: {build_id}'
+                          logger.error(reason)
+                          cfnresponse.send(event, context, cfnresponse.FAILED, {},
+                                           reason=reason)
+                          return
+                      # else IN_PROGRESS — continue polling
+
+              except Exception as e:
+                  logger.error(f'Error: {e}')
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {},
+                                   reason=str(e))
+
+  # 5.6 - Custom Resource: Lambda Packager Trigger
+  LambdaPackagerTrigger:
+    Type: Custom::CodeBuildTrigger
+    Properties:
+      ServiceToken: !GetAtt CodeBuildTriggerLambda.Arn
+      ServiceTimeout: 900
+      ProjectName: !Ref LambdaPackagerProject
+
+  # 5.7 - Custom Resource: WebUI Builder Trigger
+  WebUIBuilderTrigger:
+    Type: Custom::CodeBuildTrigger
+    Properties:
+      ServiceToken: !GetAtt CodeBuildTriggerLambda.Arn
+      ServiceTimeout: 900
+      ProjectName: !Ref WebUIBuilderProject
+
+  # ===========================================================================
+  # Task 6: Config Generator and Cognito User Creator Custom Resources
+  # ===========================================================================
+
+  # 6.1 - Config Generator Lambda Role
+  ConfigGeneratorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub lambda.${AWS::URLSuffix}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: S3WriteAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${WebUIBucket}/*"
+        - PolicyName: CloudFrontInvalidation
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateInvalidation
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${WebUIDistribution}"
+
+  # 6.1 - Config Generator Lambda
+  ConfigGeneratorLambda:
+    Type: AWS::Lambda::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: AWSLambdaBasicExecutionRole includes CloudWatch Logs permissions
+          - id: W89
+            reason: CloudFormation custom function does not need VPC
+          - id: W92
+            reason: CloudFormation custom function does not need reserved concurrency
+    Properties:
+      Description: Generates aws-config.js and writes it to the WebUI S3 bucket
+      Handler: index.handler
+      Runtime: python3.13
+      MemorySize: 128
+      Timeout: 300
+      Architectures:
+        - arm64
+      Role: !GetAtt ConfigGeneratorRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+          import logging
+          import hashlib
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def handler(event, context):
+              logger.info('Incoming event: %s', json.dumps(event, indent=2, default=str))
+              response_data = {}
+              try:
+                  s3_client = boto3.client('s3')
+                  cloudfront_client = boto3.client('cloudfront')
+                  request_type = event['RequestType']
+                  resource_props = event.get('ResourceProperties', {})
+
+                  config_data = {
+                      'Region': resource_props.get('Region'),
+                      'UserPoolId': resource_props.get('UserPoolId'),
+                      'UserPoolClientId': resource_props.get('UserPoolClientId'),
+                      'IdentityPoolId': resource_props.get('IdentityPoolId'),
+                      'ApiGatewayUrl': resource_props.get('ApiGatewayUrl'),
+                      'CognitoDomain': resource_props.get('CognitoDomain'),
+                  }
+                  config_string = json.dumps(config_data, sort_keys=True)
+                  deployment_hash = hashlib.sha256(config_string.encode()).hexdigest()[:16]
+                  physical_resource_id = f'ConfigGenerator-{deployment_hash}'
+                  response_data['DeploymentHash'] = deployment_hash
+
+                  if request_type == 'Delete':
+                      logger.info('Delete request - config file preserved')
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data, physical_resource_id)
+                      return
+
+                  if request_type in ('Create', 'Update'):
+                      config_content = f"""window.AWS_CONFIG = {{
+            region: "{resource_props.get('Region')}",
+            userPoolId: "{resource_props.get('UserPoolId')}",
+            userPoolWebClientId: "{resource_props.get('UserPoolClientId')}",
+            identityPoolId: "{resource_props.get('IdentityPoolId')}",
+            apiGatewayUrl: "{resource_props.get('ApiGatewayUrl')}",
+            cognitoDomain: "{resource_props.get('CognitoDomain')}"
+          }};
+          """
+                      s3_client.put_object(
+                          Bucket=resource_props.get('BucketName'),
+                          Key='aws-config.js',
+                          Body=config_content,
+                          ContentType='application/javascript',
+                          CacheControl='no-cache',
+                      )
+                      logger.info('Config file %sd successfully', request_type.lower())
+
+                      if resource_props.get('DistributionId'):
+                          cloudfront_client.create_invalidation(
+                              DistributionId=resource_props.get('DistributionId'),
+                              InvalidationBatch={
+                                  'CallerReference': str(context.aws_request_id),
+                                  'Paths': {'Quantity': 1, 'Items': ['/aws-config.js']},
+                              },
+                          )
+                          logger.info('CloudFront invalidation created')
+
+                      response_data['Message'] = f'Config file {request_type.lower()}d successfully'
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data, physical_resource_id)
+                  else:
+                      logger.error('Unknown request type: %s', request_type)
+                      response_data['Error'] = f'Unknown request type: {request_type}'
+                      cfnresponse.send(event, context, cfnresponse.FAILED, response_data, physical_resource_id)
+
+              except Exception as e:
+                  logger.error('Error: %s', str(e))
+                  response_data['Error'] = str(e)
+                  fallback_id = f'ConfigGenerator-{context.aws_request_id[:16]}'
+                  cfnresponse.send(event, context, cfnresponse.FAILED, response_data, fallback_id)
+
+  # 6.2 - Config Generator Custom Resource
+  ConfigGeneratorResource:
+    Type: Custom::ConfigGenerator
+    DependsOn: WebUIBuilderTrigger
+    Properties:
+      ServiceToken: !GetAtt ConfigGeneratorLambda.Arn
+      BucketName: !Ref WebUIBucket
+      DistributionId: !Ref WebUIDistribution
+      Region: !Ref "AWS::Region"
+      UserPoolId: !Ref CognitoUserPool
+      UserPoolClientId: !Ref CognitoUserPoolClient
+      IdentityPoolId: !Ref CognitoIdentityPool
+      ApiGatewayUrl: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.${AWS::URLSuffix}/prod/"
+      CognitoDomain: !Sub
+        - "${DomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
+        - DomainPrefix: !Sub
+            - "lss-platform-${UniqueId}"
+            - UniqueId: !Select [0, !Split ["-", !Select [2, !Split ["/", !Ref "AWS::StackId"]]]]
+
+  # 6.3 - Cognito User Creator Lambda Role
+  CognitoUserCreatorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub lambda.${AWS::URLSuffix}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: CognitoAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminSetUserPassword
+                  - cognito-idp:DescribeUserPoolClient
+                Resource:
+                  - !GetAtt CognitoUserPool.Arn
+        - PolicyName: SSMAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                  - ssm:DeleteParameter
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Workshop/platform/*"
+        - PolicyName: AgentCoreIdentityAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock-agentcore:CreateOauth2CredentialProvider
+                  - bedrock-agentcore:DeleteOauth2CredentialProvider
+                  - bedrock-agentcore:CreateTokenVault
+                  - bedrock-agentcore:GetTokenVault
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:DeleteSecret
+                Resource: "*"
+
+  # 6.3 - Cognito User Creator Lambda
+  CognitoUserCreatorLambda:
+    Type: AWS::Lambda::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: AWSLambdaBasicExecutionRole includes CloudWatch Logs permissions
+          - id: W89
+            reason: CloudFormation custom function does not need VPC
+          - id: W92
+            reason: CloudFormation custom function does not need reserved concurrency
+    Properties:
+      Description: Creates default workshop participant user in Cognito
+      Handler: index.handler
+      Runtime: python3.13
+      MemorySize: 128
+      Timeout: 60
+      Architectures:
+        - arm64
+      Role: !GetAtt CognitoUserCreatorRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import logging
+          import string
+          import secrets
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def generate_password(length=16):
+              """Generate a password meeting Cognito policy: 8+ chars, mixed case, digits, symbols."""
+              lower = string.ascii_lowercase
+              upper = string.ascii_uppercase
+              digits = string.digits
+              symbols = '!@#$%^&*()_+-='
+              # Ensure at least one of each required type
+              password = [
+                  secrets.choice(lower),
+                  secrets.choice(upper),
+                  secrets.choice(digits),
+                  secrets.choice(symbols),
+              ]
+              all_chars = lower + upper + digits + symbols
+              password += [secrets.choice(all_chars) for _ in range(length - 4)]
+              # Shuffle to avoid predictable positions
+              password_list = list(password)
+              secrets.SystemRandom().shuffle(password_list)
+              return ''.join(password_list)
+
+          def handler(event, context):
+              logger.info(f'Event: {event}')
+              try:
+                  cognito = boto3.client('cognito-idp')
+                  ssm = boto3.client('ssm')
+                  request_type = event['RequestType']
+                  props = event['ResourceProperties']
+                  user_pool_id = props['UserPoolId']
+                  username = props.get('Username', 'participant')
+                  cloudfront_url = props.get('CloudFrontUrl', '')
+
+                  if request_type == 'Delete':
+                      try:
+                          cognito.admin_delete_user(
+                              UserPoolId=user_pool_id,
+                              Username=username
+                          )
+                          logger.info(f'Deleted user {username}')
+                      except cognito.exceptions.UserNotFoundException:
+                          logger.info(f'User {username} not found, nothing to delete')
+                      except Exception as e:
+                          logger.warning(f'Error deleting user: {e}')
+                      # Delete AgentCore OAuth2 credential provider
+                      try:
+                          agentcore = boto3.client('bedrock-agentcore-control')
+                          agentcore.delete_oauth2_credential_provider(name='cognito-provider')
+                          logger.info('Deleted AgentCore OAuth2 credential provider')
+                      except Exception as e:
+                          logger.warning(f'Error deleting credential provider: {e}')
+                      # Clean up SSM parameters
+                      for key in ('username', 'password', 'url', 'cognito_discovery_url', 'cognito_client_id', 'user_pool_domain', 'm2m_client_id', 'm2m_client_secret', 'credential_provider_name'):
+                          try:
+                              ssm.delete_parameter(Name=f'/Workshop/platform/{key}')
+                          except ssm.exceptions.ParameterNotFound:
+                              pass
+                          except Exception as e:
+                              logger.warning(f'Error deleting SSM param: {e}')
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      return
+
+                  password = generate_password()
+
+                  try:
+                      cognito.admin_create_user(
+                          UserPoolId=user_pool_id,
+                          Username=username,
+                          UserAttributes=[
+                              {'Name': 'email', 'Value': 'participant@workshop.local'},
+                              {'Name': 'given_name', 'Value': 'Workshop'},
+                              {'Name': 'family_name', 'Value': 'Participant'},
+                              {'Name': 'email_verified', 'Value': 'true'},
+                          ],
+                          MessageAction='SUPPRESS',
+                      )
+                      logger.info(f'Created user {username}')
+                  except cognito.exceptions.UsernameExistsException:
+                      logger.info(f'User {username} already exists')
+
+                  cognito.admin_set_user_password(
+                      UserPoolId=user_pool_id,
+                      Username=username,
+                      Password=password,
+                      Permanent=True,
+                  )
+                  logger.info(f'Set permanent password for {username}')
+
+                  # Store credentials in SSM
+                  ssm.put_parameter(
+                      Name='/Workshop/platform/username',
+                      Value=username,
+                      Type='String',
+                      Overwrite=True,
+                  )
+                  ssm.put_parameter(
+                      Name='/Workshop/platform/password',
+                      Value=password,
+                      Type='SecureString',
+                      Overwrite=True,
+                  )
+                  ssm.put_parameter(
+                      Name='/Workshop/platform/url',
+                      Value=cloudfront_url,
+                      Type='String',
+                      Overwrite=True,
+                  )
+                  region = props.get('Region', 'us-east-1')
+                  user_pool_client_id = props.get('UserPoolClientId', '')
+                  m2m_client_id = props.get('M2MClientId', '')
+                  discovery_url = f'https://cognito-idp.{region}.amazonaws.com/{user_pool_id}/.well-known/openid-configuration'
+                  ssm.put_parameter(
+                      Name='/Workshop/platform/cognito_discovery_url',
+                      Value=discovery_url,
+                      Type='String',
+                      Overwrite=True,
+                  )
+                  ssm.put_parameter(
+                      Name='/Workshop/platform/cognito_client_id',
+                      Value=user_pool_client_id,
+                      Type='String',
+                      Overwrite=True,
+                  )
+                  user_pool_domain = props.get('UserPoolDomain', '')
+                  ssm.put_parameter(
+                      Name='/Workshop/platform/user_pool_domain',
+                      Value=user_pool_domain,
+                      Type='String',
+                      Overwrite=True,
+                  )
+                  ssm.put_parameter(
+                      Name='/Workshop/platform/m2m_client_id',
+                      Value=m2m_client_id,
+                      Type='String',
+                      Overwrite=True,
+                  )
+                  # Fetch and store the M2M client secret
+                  if m2m_client_id:
+                      m2m_client_desc = cognito.describe_user_pool_client(
+                          UserPoolId=user_pool_id,
+                          ClientId=m2m_client_id,
+                      )
+                      m2m_client_secret = m2m_client_desc['UserPoolClient'].get('ClientSecret', '')
+                      ssm.put_parameter(
+                          Name='/Workshop/platform/m2m_client_secret',
+                          Value=m2m_client_secret,
+                          Type='SecureString',
+                          Overwrite=True,
+                      )
+                      # Create AgentCore OAuth2 credential provider
+                      agentcore = boto3.client('bedrock-agentcore-control')
+                      agentcore.create_oauth2_credential_provider(
+                          name='cognito-provider',
+                          credentialProviderVendor='CustomOauth2',
+                          oauth2ProviderConfigInput={
+                              'customOauth2ProviderConfig': {
+                                  'clientId': m2m_client_id,
+                                  'clientSecret': m2m_client_secret,
+                                  'oauthDiscovery': {
+                                      'discoveryUrl': f'https://cognito-idp.{region}.amazonaws.com/{user_pool_id}/.well-known/openid-configuration',
+                                  },
+                              }
+                          }
+                      )
+                      logger.info('Created AgentCore OAuth2 credential provider')
+                      ssm.put_parameter(
+                          Name='/Workshop/platform/credential_provider_name',
+                          Value='cognito-provider',
+                          Type='String',
+                          Overwrite=True,
+                      )
+                  logger.info('Stored credentials in SSM')
+
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                      'Username': username,
+                      'Password': password,
+                      'Url': cloudfront_url,
+                  }, noEcho=True)
+
+              except Exception as e:
+                  logger.error(f'Error: {e}')
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {},
+                                   reason=str(e))
+
+  # 6.4 - Cognito User Creator Custom Resource
+  CognitoUserCreatorResource:
+    Type: Custom::CognitoUserCreator
+    Properties:
+      ServiceToken: !GetAtt CognitoUserCreatorLambda.Arn
+      UserPoolId: !Ref CognitoUserPool
+      UserPoolClientId: !Ref CognitoUserPoolClient
+      M2MClientId: !Ref M2MClient
+      Region: !Ref "AWS::Region"
+      Username: participant@workshop.local
+      CloudFrontUrl: !Sub "https://${WebUIDistribution.DomainName}"
+      UserPoolDomain: !Sub
+        - "lss-platform-${UniqueId}"
+        - UniqueId: !Select [0, !Split ["-", !Select [2, !Split ["/", !Ref "AWS::StackId"]]]]
+
+# ===========================================================================
+# Task 7: CloudFormation Outputs
+# ===========================================================================
+Outputs:
+  ApiGatewayUrl:
+    Description: LSS Workshop Platform API Gateway URL
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.${AWS::URLSuffix}/prod/"
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiUrl"
+
+  PlatformURL:
+    Description: LSS Workshop Platform URL
+    Value: !Sub "https://${WebUIDistribution.DomainName}"
+
+  CognitoUserPoolConsoleUrl:
+    Description: Cognito User Pool console URL
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/cognito/v2/idp/user-pools/${CognitoUserPool}/users?region=${AWS::Region}"
+
+  CognitoUserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref CognitoUserPool
+
+  PlatformUsername:
+    Description: Platform login username
+    Value: !GetAtt CognitoUserCreatorResource.Username
+
+  PlatformPassword:
+    Description: Platform login password
+    Value: !GetAtt CognitoUserCreatorResource.Password

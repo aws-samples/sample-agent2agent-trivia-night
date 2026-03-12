@@ -127,11 +127,26 @@ Resources:
             Resource: "*"
           - Effect: Allow
             Action:
-              - bedrock-agentcore:GetWorkloadAccessTokenForUserId
-              - bedrock-agentcore:CreateWorkloadIdentity
               - bedrock-agentcore:CreateAgentRuntime
+              - bedrock-agentcore:CreateAgentRuntimeEndpoint
+              - bedrock-agentcore:CreateOauth2CredentialProvider
+              - bedrock-agentcore:CreateTokenVault
+              - bedrock-agentcore:CreateWorkloadIdentity
+              - bedrock-agentcore:DeleteWorkloadIdentity
+              - bedrock-agentcore:GetWorkloadAccessTokenForJWT
+              - bedrock-agentcore:GetResourceOauth2Token
+              - bedrock-agentcore:GetWorkloadAccessTokenForUserId
               - bedrock-agentcore:InvokeAgentRuntime
               - bedrock-agentcore:InvokeAgentRuntimeForUser
+              - bedrock-agentcore:UpdateAgentRuntime
+              - bedrock-agentcore:UpdateOauth2CredentialProvider
+              - bedrock-agentcore:UpdateWorkloadIdentity
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - secretsmanager:CreateSecret
+              - secretsmanager:GetSecretValue
+              - secretsmanager:PutSecretValue
             Resource: "*"
           - Effect: Allow
             Action:
@@ -145,6 +160,7 @@ Resources:
             Resource:
               - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/AgentCore-*"
               - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/AgentCore-*"
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/AmazonBedrockAgentCoreSDKRuntime-*"
           - Effect: Allow
             Action:
               - bedrock:InvokeModel
@@ -161,3 +177,11 @@ Resources:
             Condition:
               StringEquals:
                 aws:CalledViaLast: "bedrock.amazonaws.com"
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource: !Sub "arn:${AWS::Partition}:s3:::bedrock-agentcore-*"
+          - Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/AmazonBedrockAgentCoreSDKRuntime-*"
