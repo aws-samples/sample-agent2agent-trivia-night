@@ -1,0 +1,6 @@
+ignore:
+  - vulnerability: GHSA-67mh-4wv8-2f99
+    reason: >
+      esbuild is a transitive dependency of Vite and is not used directly.
+      The vulnerable esbuild --serve mode is not invoked in this project;
+      Vite uses its own dev server. Risk is negligible in this context.
