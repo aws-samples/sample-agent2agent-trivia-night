@@ -321,7 +321,7 @@ const AgentsPage: React.FC = () => {
       await api.deleteAgent(agent.agent_id);
       refresh();
     } catch (err: any) {
-      alert(`Failed to delete agent: ${err.message ?? 'Unknown error'}`);
+      setError(`Failed to delete agent: ${err.message ?? 'Unknown error'}`);
     } finally {
       setDeleteLoading(null);
     }
