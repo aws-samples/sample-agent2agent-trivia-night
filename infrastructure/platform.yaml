@@ -1223,6 +1223,10 @@ Resources:
         skip:
           - id: CKV_AWS_115
             comment: CloudFormation custom function does not need reserved concurrency
+          - id: CKV_AWS_116
+            comment: DLQ not required for this CloudFormation custom resource Lambda; failures are surfaced via CloudWatch Logs
+          - id: CKV_AWS_117
+            comment: CloudFormation custom function does not need VPC
       cfn_nag:
         rules_to_suppress:
           - id: W58
