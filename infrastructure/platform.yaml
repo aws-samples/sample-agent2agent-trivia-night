@@ -300,6 +300,13 @@ Resources:
   ApiStage:
     Type: AWS::ApiGateway::Stage
     DependsOn: ApiGatewayAccount
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_73
+            comment: Workshop API; X-Ray tracing not required
+          - id: CKV_AWS_120
+            comment: Workshop API; caching not required
     Properties:
       RestApiId: !Ref ApiGateway
       DeploymentId: !Ref ApiDeployment
