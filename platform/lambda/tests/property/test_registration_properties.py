@@ -261,7 +261,7 @@ class TestFailedRegistrationExitsWithError:
             # Set up boto3 credentials mock
             mock_session = MagicMock()
             mock_creds = MagicMock()
-            mock_creds.access_key = "AKIAIOSFODNN7EXAMPLE"
+            mock_creds.access_key = "AKIAIOSFODNN7EXAMPLE"  # nosemgrep: aws-access-token
             mock_creds.secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # nosec B105
             mock_creds.token = "test-token"  # nosec B105
             mock_session.get_credentials.return_value.get_frozen_credentials.return_value = mock_creds
@@ -296,7 +296,7 @@ class TestFailedRegistrationExitsWithError:
             # Set up boto3 credentials mock
             mock_session = MagicMock()
             mock_creds = MagicMock()
-            mock_creds.access_key = "AKIAIOSFODNN7EXAMPLE"
+            mock_creds.access_key = "AKIAIOSFODNN7EXAMPLE"  # nosemgrep: aws-access-token
             mock_creds.secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # nosec B105
             mock_creds.token = "test-token"  # nosec B105
             mock_session.get_credentials.return_value.get_frozen_credentials.return_value = mock_creds
@@ -329,7 +329,7 @@ class TestFailedRegistrationExitsWithError:
              patch.object(register_agent, "boto3") as mock_boto3:
             mock_session = MagicMock()
             mock_creds = MagicMock()
-            mock_creds.access_key = "AKIAIOSFODNN7EXAMPLE"
+            mock_creds.access_key = "AKIAIOSFODNN7EXAMPLE"  # nosemgrep: aws-access-token
             mock_creds.secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # nosec B105
             mock_creds.token = "test-token"  # nosec B105
             mock_session.get_credentials.return_value.get_frozen_credentials.return_value = mock_creds
