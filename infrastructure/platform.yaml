@@ -148,8 +148,6 @@ Resources:
             reason: IAM role has explicit CloudWatch Logs permissions via inline policy
           - id: W89
             reason: Lambda does not require VPC access for this workshop
-          - id: W92
-            reason: Reserved concurrency not needed for workshop Lambda
     Properties:
       FunctionName: !Sub "${AWS::StackName}-api"
       Description: LSS Workshop Platform API Lambda function
@@ -157,6 +155,7 @@ Resources:
       Handler: handler.lambda_handler
       MemorySize: 512
       Timeout: 60
+      ReservedConcurrentExecutions: 10
       Architectures:
         - x86_64
       Role: !GetAtt ApiLambdaRole.Arn
@@ -901,6 +900,8 @@ Resources:
     Metadata:
       checkov:
         skip:
+          - id: CKV_AWS_115
+            comment: CloudFormation custom function does not need reserved concurrency
           - id: CKV_AWS_116
             comment: DLQ not required for this CloudFormation custom resource Lambda; failures are surfaced via CloudWatch Logs
           - id: CKV_AWS_117
@@ -1038,6 +1039,8 @@ Resources:
     Metadata:
       checkov:
         skip:
+          - id: CKV_AWS_115
+            comment: CloudFormation custom function does not need reserved concurrency
           - id: CKV_AWS_116
             comment: DLQ not required for this CloudFormation custom resource Lambda; failures are surfaced via CloudWatch Logs
           - id: CKV_AWS_117
@@ -1216,6 +1219,10 @@ Resources:
   CognitoUserCreatorLambda:
     Type: AWS::Lambda::Function
     Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: CloudFormation custom function does not need reserved concurrency
       cfn_nag:
         rules_to_suppress:
           - id: W58
