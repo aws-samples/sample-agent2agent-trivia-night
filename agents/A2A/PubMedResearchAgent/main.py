@@ -51,7 +51,7 @@ from fastapi import FastAPI
 # Use the complete runtime URL from environment variable, fallback to local
 runtime_url = os.environ.get("AGENTCORE_RUNTIME_URL", "http://127.0.0.1:9000/")
 logging.info(f"Runtime URL: {runtime_url}")
-host, port = "0.0.0.0", 9000
+host, port = "0.0.0.0", 9000  # nosec B104 — binds all interfaces intentionally; runs inside a container behind AgentCore Runtime proxy
 
 # Pass runtime_url to http_url parameter AND use serve_at_root=True
 a2a_server = A2AServer(

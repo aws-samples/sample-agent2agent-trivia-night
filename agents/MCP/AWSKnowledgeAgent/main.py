@@ -25,7 +25,7 @@ Always cite the documentation source when answering questions."""
 mcp = FastMCP(
     "aws-knowledge-agent",
     stateless_http=True,
-    host="0.0.0.0",
+    host="0.0.0.0",  # nosec B104 — binds all interfaces intentionally; runs inside a container behind AgentCore Runtime proxy
     port=8000,
 )
 
