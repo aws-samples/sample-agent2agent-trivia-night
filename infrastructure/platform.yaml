@@ -134,6 +134,12 @@ Resources:
       - ApiLambdaLogGroup
       - LambdaPackagerTrigger
     Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_116
+            comment: DLQ not required for this workshop Lambda; failures are surfaced via CloudWatch Logs
+          - id: CKV_AWS_117
+            comment: Lambda does not require VPC access for this workshop
       cfn_nag:
         rules_to_suppress:
           - id: W58
@@ -870,6 +876,12 @@ Resources:
   CodeBuildTriggerLambda:
     Type: AWS::Lambda::Function
     Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_116
+            comment: DLQ not required for this CloudFormation custom resource Lambda; failures are surfaced via CloudWatch Logs
+          - id: CKV_AWS_117
+            comment: CloudFormation custom function does not need VPC
       cfn_nag:
         rules_to_suppress:
           - id: W58
@@ -1001,6 +1013,12 @@ Resources:
   ConfigGeneratorLambda:
     Type: AWS::Lambda::Function
     Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_116
+            comment: DLQ not required for this CloudFormation custom resource Lambda; failures are surfaced via CloudWatch Logs
+          - id: CKV_AWS_117
+            comment: CloudFormation custom function does not need VPC
       cfn_nag:
         rules_to_suppress:
           - id: W58
