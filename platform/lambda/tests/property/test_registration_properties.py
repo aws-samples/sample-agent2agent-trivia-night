@@ -262,8 +262,8 @@ class TestFailedRegistrationExitsWithError:
             mock_session = MagicMock()
             mock_creds = MagicMock()
             mock_creds.access_key = "AKIAIOSFODNN7EXAMPLE"
-            mock_creds.secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-            mock_creds.token = "test-token"
+            mock_creds.secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # nosec B105
+            mock_creds.token = "test-token"  # nosec B105
             mock_session.get_credentials.return_value.get_frozen_credentials.return_value = mock_creds
             mock_boto3.Session.return_value = mock_session
 
@@ -297,8 +297,8 @@ class TestFailedRegistrationExitsWithError:
             mock_session = MagicMock()
             mock_creds = MagicMock()
             mock_creds.access_key = "AKIAIOSFODNN7EXAMPLE"
-            mock_creds.secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-            mock_creds.token = "test-token"
+            mock_creds.secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # nosec B105
+            mock_creds.token = "test-token"  # nosec B105
             mock_session.get_credentials.return_value.get_frozen_credentials.return_value = mock_creds
             mock_boto3.Session.return_value = mock_session
 
@@ -330,8 +330,8 @@ class TestFailedRegistrationExitsWithError:
             mock_session = MagicMock()
             mock_creds = MagicMock()
             mock_creds.access_key = "AKIAIOSFODNN7EXAMPLE"
-            mock_creds.secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-            mock_creds.token = "test-token"
+            mock_creds.secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # nosec B105
+            mock_creds.token = "test-token"  # nosec B105
             mock_session.get_credentials.return_value.get_frozen_credentials.return_value = mock_creds
             mock_boto3.Session.return_value = mock_session
 

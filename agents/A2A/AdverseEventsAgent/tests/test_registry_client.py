@@ -18,8 +18,8 @@ def _mock_boto3_session():
     mock_session = MagicMock()
     mock_creds = MagicMock()
     mock_creds.access_key = "AKIAIOSFODNN7EXAMPLE"
-    mock_creds.secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-    mock_creds.token = "FwoGZXIvYXdzEBYaDH"
+    mock_creds.secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # nosec B105
+    mock_creds.token = "FwoGZXIvYXdzEBYaDH"  # nosec B105
     mock_session.return_value.get_credentials.return_value.get_frozen_credentials.return_value = mock_creds
     return mock_session
 
