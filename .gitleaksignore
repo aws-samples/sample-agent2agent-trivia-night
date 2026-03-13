@@ -1,2 +1,8 @@
 d3c5bec1e0950e34024a75f02a6a77bcd3352653:platform/lambda/tests/property/test_registration_properties.py:aws-access-token:264
-0c83280eb205e3683be7f05ffb2ffd8c909d3620
+0c83280eb205e3683be7f05ffb2ffd8c909d3620:agents/A2A/AdverseEventsAgent/tests/test_properties_discovery.py:aws-access-token:59
+0c83280eb205e3683be7f05ffb2ffd8c909d3620:agents/A2A/AdverseEventsAgent/tests/test_registry_client.py:aws-access-token:20
+c8bd6936629030fd7a27e5fcdb02350be07366a5:platform/lambda/tests/property/test_registration_properties.py:aws-access-token:264
+c8bd6936629030fd7a27e5fcdb02350be07366a5:platform/lambda/tests/property/test_registration_properties.py:aws-access-token:299
+d3c5bec1e0950e34024a75f02a6a77bcd3352653:platform/lambda/tests/property/test_registration_properties.py:aws-access-token:299
+d3c5bec1e0950e34024a75f02a6a77bcd3352653:platform/lambda/tests/property/test_registration_properties.py:aws-access-token:332
+c8bd6936629030fd7a27e5fcdb02350be07366a5:platform/lambda/tests/property/test_registration_properties.py:aws-access-token:332

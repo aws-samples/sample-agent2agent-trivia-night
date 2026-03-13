@@ -117,7 +117,7 @@ def poll_until_ready() -> str:
         )
         if result.returncode != 0:
             print(f"  agentcore status returned {result.returncode}, retrying …")
-            time.sleep(POLL_INTERVAL_SECONDS)
+            time.sleep(POLL_INTERVAL_SECONDS) # nosemgrep
             continue
 
         output = result.stdout
@@ -154,7 +154,7 @@ def poll_until_ready() -> str:
                         return url
 
         print("  Endpoint not ready yet, retrying …")
-        time.sleep(POLL_INTERVAL_SECONDS)
+        time.sleep(POLL_INTERVAL_SECONDS) # nosemgrep
 
     # Fallback: try reading ARN from .bedrock_agentcore.yaml
     try:
