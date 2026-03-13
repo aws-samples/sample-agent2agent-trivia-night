@@ -36,7 +36,7 @@ def fetch_agent_card():
 
     try:
         # Make the request
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
 
         # Parse and pretty print JSON
