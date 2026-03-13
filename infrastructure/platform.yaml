@@ -140,6 +140,8 @@ Resources:
             comment: DLQ not required for this workshop Lambda; failures are surfaced via CloudWatch Logs
           - id: CKV_AWS_117
             comment: Lambda does not require VPC access for this workshop
+          - id: CKV_AWS_173
+            comment: Workshop Lambda; CMK encryption of env vars not required
       cfn_nag:
         rules_to_suppress:
           - id: W58
