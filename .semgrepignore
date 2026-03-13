@@ -1,0 +1,4 @@
+# Semgrep ignore rules
+# platform/web-ui/src is excluded from jsx-not-internationalized findings.
+# This application is not intended for international distribution.
+platform/web-ui/src/
