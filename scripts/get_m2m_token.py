@@ -46,7 +46,7 @@ def fetch_token(token_endpoint: str, client_id: str, client_secret: str) -> str:
         },
         method="POST",
     )
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req) as resp:  # nosec B310 — URL is constructed from a hardcoded HTTPS Cognito domain, not user input
         return json.loads(resp.read().decode())["access_token"]
 
 
