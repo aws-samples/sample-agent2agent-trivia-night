@@ -27,9 +27,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-PROFILE_FLAG=""
+PROFILE_FLAG=()
 if [ -n "$PROFILE" ]; then
-  PROFILE_FLAG="--profile $PROFILE"
+  PROFILE_FLAG=("--profile" "$PROFILE")
 fi
 
 export AWS_DEFAULT_REGION="$REGION"
@@ -51,7 +51,7 @@ echo ""
 
 # Verify credentials
 echo "==> Verifying AWS credentials..."
-CALLER_IDENTITY=$(aws sts get-caller-identity $PROFILE_FLAG --region "$REGION" --output json 2>&1) || {
+CALLER_IDENTITY=$(aws sts get-caller-identity "${PROFILE_FLAG[@]}" --region "$REGION" --output json 2>&1) || {
   echo "ERROR: AWS authentication failed. Please check your authentication and try again."
   exit 1
 }
@@ -62,7 +62,7 @@ echo ""
 # Clean up SSM parameters
 echo "==> Cleaning up SSM parameters..."
 for param in /Workshop/platform/username /Workshop/platform/password /Workshop/platform/url /Workshop/platform/api-url; do
-  aws ssm delete-parameter --name "$param" $PROFILE_FLAG --region "$REGION" > /dev/null 2>&1 || true
+  aws ssm delete-parameter --name "$param" "${PROFILE_FLAG[@]}" --region "$REGION" > /dev/null 2>&1 || true
 done
 echo "    SSM parameters cleaned."
 echo ""
@@ -76,7 +76,7 @@ if [ ! -d "node_modules" ]; then
   npm install --silent
 fi
 
-npx cdk destroy "$WEBUI_STACK" "$API_STACK" $PROFILE_FLAG --region "$REGION" --force
+npx cdk destroy "$WEBUI_STACK" "$API_STACK" "${PROFILE_FLAG[@]}" --region "$REGION" --force
 echo ""
 
 # Clean up credentials file

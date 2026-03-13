@@ -55,10 +55,10 @@ echo "  Region:  $REGION"
 echo "============================================"
 echo ""
 
-# Build profile flag (empty string if no profile specified)
-PROFILE_FLAG=""
+# Build profile flag array (empty if no profile specified)
+PROFILE_FLAG=()
 if [ -n "$PROFILE" ]; then
-  PROFILE_FLAG="--profile $PROFILE"
+  PROFILE_FLAG=("--profile" "$PROFILE")
 fi
 
 # Export region so CDK and AWS CLI always use the correct target region
@@ -73,7 +73,7 @@ export DEPLOY_REGION="$REGION"
 if [ "$DESTROY" = true ]; then
   echo "==> Destroying all stacks..."
   cd "$INFRA_DIR"
-  npx cdk destroy --all $PROFILE_FLAG --region "$REGION" --force
+  npx cdk destroy --all "${PROFILE_FLAG[@]}" --region "$REGION" --force
   echo ""
   echo "==> All stacks destroyed."
   exit 0
@@ -83,7 +83,7 @@ fi
 # Step 1: Verify AWS credentials
 # -------------------------------------------------------------------
 echo "==> Step 1: Verifying AWS credentials..."
-CALLER_IDENTITY=$(aws sts get-caller-identity $PROFILE_FLAG --region "$REGION" --output json 2>&1) || {
+CALLER_IDENTITY=$(aws sts get-caller-identity "${PROFILE_FLAG[@]}" --region "$REGION" --output json 2>&1) || {
   echo "ERROR: AWS authentication failed. Please check your authentication and try again."
   exit 1
 }
@@ -155,7 +155,7 @@ fi
 echo "==> Step 5: Checking CDK bootstrap..."
 cd "$INFRA_DIR"
 # Bootstrap is idempotent — safe to run every time
-npx cdk bootstrap $PROFILE_FLAG --region "$REGION" 2>/dev/null || {
+npx cdk bootstrap "${PROFILE_FLAG[@]}" --region "$REGION" 2>/dev/null || {
   echo "    Bootstrap may have already been done. Continuing..."
 }
 echo ""
@@ -171,13 +171,13 @@ WEBUI_STACK="WebUiStack-${REGION}"
 
 if [ "$FRONTEND_ONLY" = true ]; then
   echo "==> Step 6: Deploying $WEBUI_STACK only..."
-  npx cdk deploy "$WEBUI_STACK" $PROFILE_FLAG --region "$REGION" --require-approval never
+  npx cdk deploy "$WEBUI_STACK" "${PROFILE_FLAG[@]}" --region "$REGION" --require-approval never
 elif [ "$BACKEND_ONLY" = true ]; then
   echo "==> Step 6: Deploying $API_STACK only..."
-  npx cdk deploy "$API_STACK" $PROFILE_FLAG --region "$REGION" --require-approval never
+  npx cdk deploy "$API_STACK" "${PROFILE_FLAG[@]}" --region "$REGION" --require-approval never
 else
   echo "==> Step 6: Deploying all stacks..."
-  npx cdk deploy --all $PROFILE_FLAG --region "$REGION" --require-approval never
+  npx cdk deploy --all "${PROFILE_FLAG[@]}" --region "$REGION" --require-approval never
 fi
 
 echo ""
@@ -192,7 +192,7 @@ if [ "$BACKEND_ONLY" != true ]; then
     --stack-name "$WEBUI_STACK" \
     --query "Stacks[0].Outputs[?OutputKey=='CognitoUserPoolId'].OutputValue" \
     --output text \
-    $PROFILE_FLAG --region "$REGION" 2>/dev/null || echo "")
+    "${PROFILE_FLAG[@]}" --region "$REGION" 2>/dev/null || echo "")
 
   if [ -n "$USER_POOL_ID" ] && [ "$USER_POOL_ID" != "None" ]; then
     COGNITO_USERNAME="participant"
@@ -216,7 +216,7 @@ print(''.join(combined))
       --username "$COGNITO_USERNAME" \
       --user-attributes Name=email,Value=participant@workshop.local Name=given_name,Value=Workshop Name=family_name,Value=Participant Name=email_verified,Value=true \
       --message-action SUPPRESS \
-      $PROFILE_FLAG --region "$REGION" > /dev/null 2>&1 || true
+      "${PROFILE_FLAG[@]}" --region "$REGION" > /dev/null 2>&1 || true
 
     # Set permanent password (no change required on login)
     aws cognito-idp admin-set-user-password \
@@ -224,7 +224,7 @@ print(''.join(combined))
       --username "$COGNITO_USERNAME" \
       --password "$COGNITO_PASSWORD" \
       --permanent \
-      $PROFILE_FLAG --region "$REGION" > /dev/null
+      "${PROFILE_FLAG[@]}" --region "$REGION" > /dev/null
 
     echo "    User created: $COGNITO_USERNAME"
 
@@ -243,17 +243,17 @@ EOF
       --stack-name "$WEBUI_STACK" \
       --query "Stacks[0].Outputs[?OutputKey=='CloudFrontUrl'].OutputValue" \
       --output text \
-      $PROFILE_FLAG --region "$REGION" 2>/dev/null || echo "N/A")
+      "${PROFILE_FLAG[@]}" --region "$REGION" 2>/dev/null || echo "N/A")
 
     aws ssm put-parameter --name "/Workshop/platform/username" \
       --value "$COGNITO_USERNAME" --type String --overwrite \
-      $PROFILE_FLAG --region "$REGION" > /dev/null 2>&1 || true
+      "${PROFILE_FLAG[@]}" --region "$REGION" > /dev/null 2>&1 || true
     aws ssm put-parameter --name "/Workshop/platform/password" \
       --value "$COGNITO_PASSWORD" --type SecureString --overwrite \
-      $PROFILE_FLAG --region "$REGION" > /dev/null 2>&1 || true
+      "${PROFILE_FLAG[@]}" --region "$REGION" > /dev/null 2>&1 || true
     aws ssm put-parameter --name "/Workshop/platform/url" \
       --value "$CF_URL" --type String --overwrite \
-      $PROFILE_FLAG --region "$REGION" > /dev/null 2>&1 || true
+      "${PROFILE_FLAG[@]}" --region "$REGION" > /dev/null 2>&1 || true
   else
     echo "    WARNING: Could not get User Pool ID. Skipping user creation."
     COGNITO_USERNAME="N/A"
@@ -282,7 +282,7 @@ if [ "$FRONTEND_ONLY" != true ]; then
     --stack-name "$API_STACK" \
     --query "Stacks[0].Outputs[?OutputKey=='ApiGatewayUrl'].OutputValue" \
     --output text \
-    $PROFILE_FLAG --region "$REGION" 2>/dev/null || echo "N/A")
+    "${PROFILE_FLAG[@]}" --region "$REGION" 2>/dev/null || echo "N/A")
   echo "  API Gateway URL:  $API_URL"
 fi
 
@@ -291,12 +291,12 @@ if [ "$BACKEND_ONLY" != true ]; then
     --stack-name "$WEBUI_STACK" \
     --query "Stacks[0].Outputs[?OutputKey=='CloudFrontUrl'].OutputValue" \
     --output text \
-    $PROFILE_FLAG --region "$REGION" 2>/dev/null || echo "N/A")
+    "${PROFILE_FLAG[@]}" --region "$REGION" 2>/dev/null || echo "N/A")
   COGNITO_URL=$(aws cloudformation describe-stacks \
     --stack-name "$WEBUI_STACK" \
     --query "Stacks[0].Outputs[?OutputKey=='CognitoUserPoolConsoleUrl'].OutputValue" \
     --output text \
-    $PROFILE_FLAG --region "$REGION" 2>/dev/null || echo "N/A")
+    "${PROFILE_FLAG[@]}" --region "$REGION" 2>/dev/null || echo "N/A")
   echo "  CloudFront URL:   $CF_URL"
   echo "  Cognito Console:  $COGNITO_URL"
   if [ -n "${COGNITO_USERNAME:-}" ] && [ "$COGNITO_USERNAME" != "N/A" ]; then
