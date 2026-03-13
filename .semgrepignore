@@ -2,3 +2,8 @@
 # platform/web-ui/src is excluded from jsx-not-internationalized findings.
 # This application is not intended for international distribution.
 platform/web-ui/src/
+
+# package-dependencies-check: workshop packages use range versions intentionally;
+# dependency confusion risk is acceptable in this non-production context.
+platform/web-ui/package.json
+platform/infrastructure/package.json
