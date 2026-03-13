@@ -76,7 +76,7 @@ class AgentService:
                 f"index={self.index_name}"
             )
         except Exception as e:
-            logger.error(f"Failed to initialise AgentService: {e}")
+            logger.warning(f"Failed to initialise AgentService: {e}")
             raise AgentServiceError(
                 f"Failed to initialise services: {e}", "INITIALIZATION_ERROR"
             )
@@ -118,7 +118,7 @@ class AgentService:
         try:
             embedding_vector = self.embedding_service.generate_embedding(embedding_text)
         except EmbeddingServiceError as e:
-            logger.error(f"Embedding generation failed for new agent: {e}")
+            logger.warning(f"Embedding generation failed for new agent: {e}")
             raise AgentServiceError(
                 f"Failed to generate embedding: {e}",
                 "EMBEDDING_GENERATION_ERROR",
@@ -163,14 +163,14 @@ class AgentService:
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code", "UNKNOWN")
             msg = e.response.get("Error", {}).get("Message", str(e))
-            logger.error(f"S3 Vectors put_vectors failed [{code}]: {msg}")
+            logger.warning(f"S3 Vectors put_vectors failed [{code}]: {msg}")
             raise AgentServiceError(
                 f"Failed to store agent: {msg}",
                 "STORAGE_ERROR",
                 {"agent_id": agent_id, "aws_error_code": code},
             )
         except Exception as e:
-            logger.error(f"Unexpected error creating agent: {e}")
+            logger.warning(f"Unexpected error creating agent: {e}")
             raise AgentServiceError(f"Unexpected error creating agent: {e}")
 
     # ------------------------------------------------------------------
@@ -229,19 +229,19 @@ class AgentService:
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code", "UNKNOWN")
             msg = e.response.get("Error", {}).get("Message", str(e))
-            logger.error(f"S3 Vectors get_vectors failed [{code}]: {msg}")
+            logger.warning(f"S3 Vectors get_vectors failed [{code}]: {msg}")
             raise AgentServiceError(
                 f"Failed to retrieve agent: {msg}",
                 "RETRIEVAL_ERROR",
                 {"agent_id": agent_id, "aws_error_code": code},
             )
         except json.JSONDecodeError as e:
-            logger.error(f"Corrupted agent data agent_id={agent_id}: {e}")
+            logger.warning(f"Corrupted agent data agent_id={agent_id}: {e}")
             raise AgentServiceError(
                 f"Corrupted agent data: {e}", "DATA_CORRUPTION_ERROR"
             )
         except Exception as e:
-            logger.error(f"Unexpected error retrieving agent: {e}")
+            logger.warning(f"Unexpected error retrieving agent: {e}")
             raise AgentServiceError(f"Unexpected error retrieving agent: {e}")
 
     # ------------------------------------------------------------------
@@ -328,14 +328,14 @@ class AgentService:
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code", "UNKNOWN")
             msg = e.response.get("Error", {}).get("Message", str(e))
-            logger.error(f"S3 Vectors list_vectors failed [{code}]: {msg}")
+            logger.warning(f"S3 Vectors list_vectors failed [{code}]: {msg}")
             raise AgentServiceError(
                 f"Failed to list agents: {msg}",
                 "LISTING_ERROR",
                 {"aws_error_code": code},
             )
         except Exception as e:
-            logger.error(f"Unexpected error listing agents: {e}")
+            logger.warning(f"Unexpected error listing agents: {e}")
             raise AgentServiceError(f"Unexpected error listing agents: {e}")
 
 
@@ -400,7 +400,7 @@ class AgentService:
                     embedding_text
                 )
             except EmbeddingServiceError as e:
-                logger.error(f"Embedding generation failed during update: {e}")
+                logger.warning(f"Embedding generation failed during update: {e}")
                 raise AgentServiceError(
                     f"Failed to generate embedding: {e}",
                     "EMBEDDING_GENERATION_ERROR",
@@ -430,7 +430,7 @@ class AgentService:
             except ClientError as e:
                 code = e.response.get("Error", {}).get("Code", "UNKNOWN")
                 msg = e.response.get("Error", {}).get("Message", str(e))
-                logger.error(f"Failed to retrieve existing embedding: {msg}")
+                logger.warning(f"Failed to retrieve existing embedding: {msg}")
                 raise AgentServiceError(
                     f"Failed to retrieve existing embedding: {msg}",
                     "EMBEDDING_RETRIEVAL_ERROR",
@@ -471,14 +471,14 @@ class AgentService:
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code", "UNKNOWN")
             msg = e.response.get("Error", {}).get("Message", str(e))
-            logger.error(f"S3 Vectors put_vectors failed during update [{code}]: {msg}")
+            logger.warning(f"S3 Vectors put_vectors failed during update [{code}]: {msg}")
             raise AgentServiceError(
                 f"Failed to update agent: {msg}",
                 "UPDATE_ERROR",
                 {"agent_id": agent_id, "aws_error_code": code},
             )
         except Exception as e:
-            logger.error(f"Unexpected error updating agent: {e}")
+            logger.warning(f"Unexpected error updating agent: {e}")
             raise AgentServiceError(f"Unexpected error updating agent: {e}")
 
     # ------------------------------------------------------------------
@@ -517,12 +517,12 @@ class AgentService:
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code", "UNKNOWN")
             msg = e.response.get("Error", {}).get("Message", str(e))
-            logger.error(f"S3 Vectors delete_vectors failed [{code}]: {msg}")
+            logger.warning(f"S3 Vectors delete_vectors failed [{code}]: {msg}")
             raise AgentServiceError(
                 f"Failed to delete agent: {msg}",
                 "DELETION_ERROR",
                 {"agent_id": agent_id, "aws_error_code": code},
             )
         except Exception as e:
-            logger.error(f"Unexpected error deleting agent: {e}")
+            logger.warning(f"Unexpected error deleting agent: {e}")
             raise AgentServiceError(f"Unexpected error deleting agent: {e}")

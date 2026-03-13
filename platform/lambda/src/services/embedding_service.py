@@ -46,7 +46,7 @@ class EmbeddingService:
                 region_name=region_name,
             )
         except Exception as e:
-            logger.error(f"Failed to initialize Bedrock client: {e}")
+            logger.warning(f"Failed to initialize Bedrock client: {e}")
             raise EmbeddingServiceError(f"Failed to initialize Bedrock client: {e}")
 
     @staticmethod
@@ -150,16 +150,16 @@ class EmbeddingService:
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "Unknown")
             error_message = e.response.get("Error", {}).get("Message", str(e))
-            logger.error(f"Bedrock API error [{error_code}]: {error_message}")
+            logger.warning(f"Bedrock API error [{error_code}]: {error_message}")
             raise BedrockAPIError(f"Bedrock API error [{error_code}]: {error_message}")
         except BotoCoreError as e:
-            logger.error(f"Boto3 client error: {e}")
+            logger.warning(f"Boto3 client error: {e}")
             raise BedrockAPIError(f"Boto3 client error: {e}")
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Bedrock response: {e}")
+            logger.warning(f"Failed to parse Bedrock response: {e}")
             raise BedrockAPIError(f"Failed to parse Bedrock response: {e}")
         except Exception as e:
-            logger.error(f"Unexpected error during embedding generation: {e}")
+            logger.warning(f"Unexpected error during embedding generation: {e}")
             raise EmbeddingServiceError(
                 f"Unexpected error during embedding generation: {e}"
             )
@@ -184,7 +184,7 @@ class EmbeddingService:
             try:
                 embeddings.append(self.generate_embedding(text))
             except Exception as e:
-                logger.error(f"Failed to generate embedding for text {i}: {e}")
+                logger.warning(f"Failed to generate embedding for text {i}: {e}")
                 failed_indices.append(i)
                 embeddings.append(None)
 

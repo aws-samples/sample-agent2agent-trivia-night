@@ -64,7 +64,7 @@ class SearchService:
                 f"index={self.index_name}"
             )
         except Exception as e:
-            logger.error(f"Failed to initialise SearchService: {e}")
+            logger.warning(f"Failed to initialise SearchService: {e}")
             raise SearchServiceError(
                 f"Failed to initialise search service: {e}", "INITIALIZATION_ERROR"
             )
@@ -161,7 +161,7 @@ class SearchService:
             try:
                 query_embedding = self.embedding_service.generate_embedding(search_text)
             except EmbeddingServiceError as e:
-                logger.error(f"Failed to generate query embedding: {e}")
+                logger.warning(f"Failed to generate query embedding: {e}")
                 raise SearchServiceError(
                     f"Failed to generate query embedding: {e}", "EMBEDDING_ERROR"
                 )
@@ -253,7 +253,7 @@ class SearchService:
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "UNKNOWN")
             error_msg = e.response.get("Error", {}).get("Message", str(e))
-            logger.error(
+            logger.warning(
                 f"S3 Vectors query failed [{error_code}]: {error_msg}"
             )
             raise SearchServiceError(
@@ -262,7 +262,7 @@ class SearchService:
                 {"aws_error_code": error_code},
             )
         except Exception as e:
-            logger.error(f"Unexpected error during search: {e}")
+            logger.warning(f"Unexpected error during search: {e}")
             raise SearchServiceError(
                 f"Unexpected search error: {e}", "SEARCH_ERROR"
             )

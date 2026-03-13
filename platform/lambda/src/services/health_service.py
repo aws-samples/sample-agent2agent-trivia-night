@@ -63,7 +63,7 @@ class HealthService:
                 f"index={self.index_name}"
             )
         except Exception as e:
-            logger.error(f"Failed to initialise HealthService: {e}")
+            logger.warning(f"Failed to initialise HealthService: {e}")
             raise HealthServiceError(
                 f"Failed to initialise health service: {e}",
                 "INITIALIZATION_ERROR",
@@ -157,7 +157,7 @@ class HealthService:
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code", "UNKNOWN")
             msg = e.response.get("Error", {}).get("Message", str(e))
-            logger.error(
+            logger.warning(
                 f"S3 Vectors health update failed [{code}]: {msg}"
             )
             raise HealthServiceError(
@@ -166,7 +166,7 @@ class HealthService:
                 {"agent_id": agent_id, "aws_error_code": code},
             )
         except Exception as e:
-            logger.error(f"Unexpected error updating health: {e}")
+            logger.warning(f"Unexpected error updating health: {e}")
             raise HealthServiceError(
                 f"Unexpected error updating agent health: {e}",
                 "HEALTH_UPDATE_ERROR",
