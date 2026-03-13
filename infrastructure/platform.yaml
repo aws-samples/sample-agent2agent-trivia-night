@@ -365,6 +365,13 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_18
+            comment: Workshop bucket; access logging not required
+          - id: CKV_AWS_21
+            comment: Workshop bucket; versioning not required
     Properties:
       BucketName: !Sub "lss-platform-webui-${AWS::AccountId}-${AWS::Region}"
       PublicAccessBlockConfiguration:
@@ -421,6 +428,13 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_18
+            comment: Workshop bucket; access logging not required
+          - id: CKV_AWS_21
+            comment: Workshop bucket; versioning not required
     Properties:
       BucketName: !Sub "lss-platform-cf-logs-${AWS::AccountId}-${AWS::Region}"
       PublicAccessBlockConfiguration:
