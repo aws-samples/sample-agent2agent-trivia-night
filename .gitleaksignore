@@ -6,3 +6,6 @@ c8bd6936629030fd7a27e5fcdb02350be07366a5:platform/lambda/tests/property/test_reg
 d3c5bec1e0950e34024a75f02a6a77bcd3352653:platform/lambda/tests/property/test_registration_properties.py:aws-access-token:299
 d3c5bec1e0950e34024a75f02a6a77bcd3352653:platform/lambda/tests/property/test_registration_properties.py:aws-access-token:332
 c8bd6936629030fd7a27e5fcdb02350be07366a5:platform/lambda/tests/property/test_registration_properties.py:aws-access-token:332
+7a10281d309b245afbb79443732803b6af063a73:platform/lambda/tests/property/test_registration_properties.py:aws-access-token:264
+7a10281d309b245afbb79443732803b6af063a73:platform/lambda/tests/property/test_registration_properties.py:aws-access-token:299
+7a10281d309b245afbb79443732803b6af063a73:platform/lambda/tests/property/test_registration_properties.py:aws-access-token:332
