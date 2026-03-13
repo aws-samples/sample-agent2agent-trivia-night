@@ -90,7 +90,7 @@ def discover_api_url(region: str, stack_prefix: str, cli_api_url: str | None) ->
 def run_agentcore_launch() -> None:
     """Run ``agentcore deploy`` to deploy the agent to AgentCore Runtime."""
     print("Deploying agent via agentcore …")
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603 B607
         ["agentcore", "deploy"],
         capture_output=False,
     )
@@ -110,7 +110,7 @@ def poll_until_ready() -> str:
     deadline = time.time() + MAX_WAIT_SECONDS
 
     while time.time() < deadline:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607
             ["agentcore", "status"],
             capture_output=True,
             text=True,

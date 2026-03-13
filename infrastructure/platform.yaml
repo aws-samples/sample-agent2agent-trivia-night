@@ -123,6 +123,11 @@ Resources:
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_158
+            comment: Workshop log group; KMS CMK encryption not required
     Properties:
       LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-api"
       RetentionInDays: 7
@@ -209,6 +214,11 @@ Resources:
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_158
+            comment: Workshop log group; KMS CMK encryption not required
     Properties:
       LogGroupName: !Sub "/aws/apigateway/${AWS::StackName}-api"
       RetentionInDays: 7
@@ -441,6 +451,10 @@ Resources:
             comment: Workshop bucket; access logging not required
           - id: CKV_AWS_21
             comment: Workshop bucket; versioning not required
+          - id: CKV_AWS_53
+            comment: CloudFront logs bucket requires public ACLs to allow CloudFront to write logs
+          - id: CKV_AWS_55
+            comment: CloudFront logs bucket requires public ACLs to allow CloudFront to write logs
     Properties:
       BucketName: !Sub "lss-platform-cf-logs-${AWS::AccountId}-${AWS::Region}"
       PublicAccessBlockConfiguration:
@@ -703,6 +717,13 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_18
+            comment: Workshop bucket; access logging not required
+          - id: CKV_AWS_21
+            comment: Workshop bucket; versioning not required
     Properties:
       BucketName: !Sub "lss-platform-lambda-${AWS::AccountId}-${AWS::Region}"
       PublicAccessBlockConfiguration:
