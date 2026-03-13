@@ -159,7 +159,7 @@ def poll_until_ready() -> str:
     # Fallback: try reading ARN from .bedrock_agentcore.yaml
     try:
         import yaml
-        with open(".bedrock_agentcore.yaml") as f:
+        with open(".bedrock_agentcore.yaml", encoding="utf-8") as f:
             config = yaml.safe_load(f)
         for agent_data in config.get("agents", {}).values():
             arn = (agent_data.get("bedrock_agentcore", {}) or {}).get("agent_arn")
@@ -250,13 +250,7 @@ def register_agent(api_url: str, agent_card: dict, region: str) -> str:
         headers=dict(aws_request.headers),
         timeout=30,
     )
-
-    if response.status_code >= 400:
-        print(
-            f"ERROR: Registration failed (HTTP {response.status_code}): {response.text}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    response.raise_for_status()
 
     data = response.json()
     return data.get("agent_id", data.get("agentId", "unknown"))

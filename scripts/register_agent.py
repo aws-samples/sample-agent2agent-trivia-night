@@ -135,13 +135,7 @@ def register_agent(api_url: str, agent_card: dict, region: str) -> str:
         headers=dict(aws_request.headers),
         timeout=30,
     )
-
-    if response.status_code >= 400:
-        print(
-            f"ERROR: Registration failed (HTTP {response.status_code}): {response.text}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    response.raise_for_status()
 
     data = response.json()
     return data.get("agent_id", data.get("agentId", "unknown"))
