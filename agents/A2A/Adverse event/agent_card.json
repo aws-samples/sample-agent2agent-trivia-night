@@ -1,0 +1,43 @@
+{
+    "capabilities": {
+        "streaming": true
+    },
+    "defaultInputModes": [
+        "text"
+    ],
+    "defaultOutputModes": [
+        "text"
+    ],
+    "description": "A pharmacovigilance agent that detects safety signals in adverse event reports, searches medical literature for evidence, and generates FDA/EMA regulatory reports.",
+    "name": "Strands Agents",
+    "preferredTransport": "JSONRPC",
+    "protocolVersion": "0.3.0",
+    "skills": [
+        {
+            "description": "Analyze adverse event reports to detect potential safety signals using disproportionality analysis (PRR, ROR, IC025). Accepts a JSON list of adverse event objects and returns detected signals with statistical metrics and severity classification.",
+            "id": "detect_signals_tool",
+            "name": "detect_signals_tool",
+            "tags": []
+        },
+        {
+            "description": "Search PubMed Central for published evidence related to a drug safety signal. Accepts a drug name and adverse event term, returns relevant articles ranked by relevance with citations and a summary of findings.",
+            "id": "search_literature_tool",
+            "name": "search_literature_tool",
+            "tags": []
+        },
+        {
+            "description": "Generate FDA MedWatch and EMA EudraVigilance regulatory reports for a detected safety signal. Includes signal description, statistical evidence, literature references, clinical assessment, and recommendations.",
+            "id": "generate_report_tool",
+            "name": "generate_report_tool",
+            "tags": []
+        },
+        {
+            "description": "Editor tool designed to do changes iteratively on multiple files.\n\nThis tool provides a comprehensive interface for file operations, including viewing,\ncreating, modifying, and searching files with rich output formatting. It features\nsyntax highlighting, smart line finding, and automatic backups for safety.",
+            "id": "editor",
+            "name": "editor",
+            "tags": []
+        }
+    ],
+    "url": "http://127.0.0.1:9000/",
+    "version": "0.0.1"
+}
