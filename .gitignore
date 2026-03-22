@@ -8,3 +8,5 @@ agents/AWSKnowledgeAgent-base
 agents/myMCPServer
 aws-targets.json
 .DS_Store
+.hypothesis
+.pytest_cache

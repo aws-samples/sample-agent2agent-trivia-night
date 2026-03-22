@@ -1,0 +1,43 @@
+{
+    "capabilities": {
+        "streaming": true
+    },
+    "defaultInputModes": [
+        "text"
+    ],
+    "defaultOutputModes": [
+        "text"
+    ],
+    "description": "A research agent that searches clinical trials on ClinicalTrials.gov, queries FDA-approved drug information from OpenFDA, and creates data visualizations like pie charts.",
+    "name": "ClinicalTrialsResearcher",
+    "preferredTransport": "JSONRPC",
+    "protocolVersion": "0.3.0",
+    "skills": [
+        {
+            "description": "Search for clinical trials matching specified criteria on ClinicalTrials.gov API v2. Supports filtering by condition, intervention, comparison, outcome, location, sponsor, study ID, title, and patient characteristics.",
+            "id": "search_trials",
+            "name": "search_trials",
+            "tags": ["clinical-trials", "search"]
+        },
+        {
+            "description": "Get detailed information about a specific clinical trial by its NCT ID from the ClinicalTrials.gov API v2, including summary, phase, status, eligibility, interventions, sponsors, and outcomes.",
+            "id": "get_trial_details",
+            "name": "get_trial_details",
+            "tags": ["clinical-trials", "details"]
+        },
+        {
+            "description": "Query the OpenFDA drugsfda API for FDA-approved drugs by condition (indication) with optional route-of-administration filtering. Returns total drug count, route breakdown, and example drug names.",
+            "id": "get_approved_drugs",
+            "name": "get_approved_drugs",
+            "tags": ["fda", "drugs"]
+        },
+        {
+            "description": "Generate a pie chart from label-value data, upload the image to S3, and return a presigned URL valid for 1 hour.",
+            "id": "create_pie_chart",
+            "name": "create_pie_chart",
+            "tags": ["visualization", "charts"]
+        }
+    ],
+    "url": "http://127.0.0.1:9000/",
+    "version": "0.0.1"
+}
