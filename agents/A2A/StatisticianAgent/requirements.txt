@@ -1,0 +1,8 @@
+strands-agents[a2a]
+strands-agents-tools
+bedrock-agentcore
+boto3
+lifelines
+pandas
+numpy
+matplotlib
