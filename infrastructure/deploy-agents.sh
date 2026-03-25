@@ -5,15 +5,14 @@ STACK_OPERATION=$1
 # Anchor to the repo root regardless of where this script is invoked from
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Install uv and add it to PATH for the rest of this script
-curl -LsSf https://astral.sh/uv/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
-uv --version
-
 cd "$REPO_ROOT/agents/A2A/CalculatorAgent"
 
 if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
     echo "Hello"
+    # Install uv and add it to PATH for the rest of this script
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.local/bin:$PATH"
+    uv --version
     uv run --with bedrock-agentcore-starter-toolkit agentcore configure \
       --non-interactive \
       -n CalculatorAgent \
@@ -22,9 +21,8 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
       -rt "PYTHON_3_13" \
       -e main.py \
       -p A2A \
-      -dm \
-      --auto-update-on-conflict
-    uv run agentcore deploy
+      -dm
+    uv run agentcore deploy --auto-update-on-conflict
 
 elif [ "$STACK_OPERATION" == "Delete" ]; then
     echo "Goodbye"
