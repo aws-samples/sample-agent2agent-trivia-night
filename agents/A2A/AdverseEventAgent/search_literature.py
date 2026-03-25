@@ -10,7 +10,6 @@ import logging
 import os
 from typing import Any, Dict, List, Literal
 
-from xml.etree.ElementTree import Element  # nosec - only used for type hints
 from defusedxml import ElementTree as ET
 
 import httpx

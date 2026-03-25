@@ -1,9 +1,8 @@
 import logging
 from typing import Any, Dict, List, Optional
-from xml.etree.ElementTree import Element  # nosec
-
 import httpx
 from defusedxml import ElementTree as ET
+from defusedxml.ElementTree import Element
 from strands import tool
 
 logger = logging.getLogger("search_arxiv")

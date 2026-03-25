@@ -1,8 +1,7 @@
 import logging
-from xml.etree.ElementTree import Element  # nosec
-
 import httpx
 from defusedxml import ElementTree as ET
+from defusedxml.ElementTree import Element
 from strands import tool
 
 logger = logging.getLogger("get_paper")
