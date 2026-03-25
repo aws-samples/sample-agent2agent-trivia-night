@@ -1,0 +1,157 @@
+{
+    "capabilities": {
+        "streaming": true
+    },
+    "defaultInputModes": [
+        "text"
+    ],
+    "defaultOutputModes": [
+        "text"
+    ],
+    "description": "An AI assistant with real-time knowledge of New York City transit data for trip planning and service status.",
+    "name": "NYC Transit Agent",
+    "preferredTransport": "JSONRPC",
+    "protocolVersion": "0.3.0",
+    "skills": [
+        {
+            "description": "Get upcoming train arrivals at a station. Accepts station ID or name (e.g., \"127\", \"Times Square\", \"14th Street\").",
+            "id": "mta_get_arrivals",
+            "name": "mta_get_arrivals",
+            "tags": []
+        },
+        {
+            "description": "Get current service status for a subway line",
+            "id": "mta_get_line_status",
+            "name": "mta_get_line_status",
+            "tags": []
+        },
+        {
+            "description": "List active service alerts across the subway system. By default only shows currently active alerts.",
+            "id": "mta_list_alerts",
+            "name": "mta_list_alerts",
+            "tags": []
+        },
+        {
+            "description": "Search for stations by name or line",
+            "id": "mta_search_stations",
+            "name": "mta_search_stations",
+            "tags": []
+        },
+        {
+            "description": "Get detailed information about a specific station. Accepts station ID or name.",
+            "id": "mta_get_station_info",
+            "name": "mta_get_station_info",
+            "tags": []
+        },
+        {
+            "description": "Get route suggestions between two stations. Accepts station IDs or names.",
+            "id": "mta_plan_trip",
+            "name": "mta_plan_trip",
+            "tags": []
+        },
+        {
+            "description": "Get planned service changes, weekend schedules, and construction work. Shows what service changes are active now, coming later today, this weekend, and in the next week.",
+            "id": "mta_get_planned_work",
+            "name": "mta_get_planned_work",
+            "tags": []
+        },
+        {
+            "description": "Get active bus service alerts. Optionally filter by route or severity.",
+            "id": "bus_list_alerts",
+            "name": "bus_list_alerts",
+            "tags": []
+        },
+        {
+            "description": "Get upcoming bus arrivals at a stop. Accepts stop ID or name (e.g., \"402940\", \"5 Av/W 42 St\").",
+            "id": "bus_get_arrivals",
+            "name": "bus_get_arrivals",
+            "tags": []
+        },
+        {
+            "description": "Get detailed information about a bus route including type, boroughs served, and description.",
+            "id": "bus_get_route_info",
+            "name": "bus_get_route_info",
+            "tags": []
+        },
+        {
+            "description": "Search bus stops by name, route, or borough. Use this to find stop IDs for bus_get_arrivals.",
+            "id": "bus_search_stops",
+            "name": "bus_search_stops",
+            "tags": []
+        },
+        {
+            "description": "Get upcoming ferry arrivals at a landing. Accepts landing ID or name (e.g., \"PIER11\", \"Wall Street\", \"DUMBO\").",
+            "id": "ferry_get_arrivals",
+            "name": "ferry_get_arrivals",
+            "tags": []
+        },
+        {
+            "description": "Get active ferry service alerts. Optionally filter by route.",
+            "id": "ferry_list_alerts",
+            "name": "ferry_list_alerts",
+            "tags": []
+        },
+        {
+            "description": "Search ferry landings by name, route, or borough. Use this to find landing IDs for ferry_get_arrivals.",
+            "id": "ferry_search_landings",
+            "name": "ferry_search_landings",
+            "tags": []
+        },
+        {
+            "description": "List all NYC Ferry routes with their landings. Optionally get details for a specific route.",
+            "id": "ferry_get_routes",
+            "name": "ferry_get_routes",
+            "tags": []
+        },
+        {
+            "description": "Get bike and dock availability at a Citibike station. Accepts station ID or name (e.g., \"Broadway & W 48 St\", \"E 40 St & Park Ave\").",
+            "id": "bike_get_station_status",
+            "name": "bike_get_station_status",
+            "tags": []
+        },
+        {
+            "description": "Search for Citibike stations by name, borough, or availability. Returns station availability and capacity.",
+            "id": "bike_search_stations",
+            "name": "bike_search_stations",
+            "tags": []
+        },
+        {
+            "description": "Get an overview of Citibike availability by borough. Shows total bikes, docks, and station availability.",
+            "id": "bike_get_availability_summary",
+            "name": "bike_get_availability_summary",
+            "tags": []
+        },
+        {
+            "description": "Get upcoming LIRR or Metro-North departures at a station. Accepts station ID or name (e.g., \"PENN\", \"Grand Central\").",
+            "id": "rail_get_departures",
+            "name": "rail_get_departures",
+            "tags": []
+        },
+        {
+            "description": "Get active LIRR and Metro-North service alerts. Optionally filter by system, branch, or severity.",
+            "id": "rail_list_alerts",
+            "name": "rail_list_alerts",
+            "tags": []
+        },
+        {
+            "description": "Search LIRR and Metro-North stations by name, system, or branch. Use this to find station IDs for rail_get_departures.",
+            "id": "rail_search_stations",
+            "name": "rail_search_stations",
+            "tags": []
+        },
+        {
+            "description": "Get detailed information about a LIRR or Metro-North station including accessibility, platforms, parking, and zone.",
+            "id": "rail_get_station_info",
+            "name": "rail_get_station_info",
+            "tags": []
+        },
+        {
+            "description": "Ask natural language questions about NYC transit (subway, bus, ferry, rail, bike). Examples: \"When is the next 1 train at Times Square?\", \"How do I get to JFK?\", \"Are there any Citibikes near Grand Central?\"",
+            "id": "transit_ask",
+            "name": "transit_ask",
+            "tags": []
+        }
+    ],
+    "url": "",
+    "version": "0.0.1"
+}

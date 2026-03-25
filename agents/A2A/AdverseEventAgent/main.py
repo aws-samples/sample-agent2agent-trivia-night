@@ -47,6 +47,7 @@ model = BedrockModel(
 os.environ["BYPASS_TOOL_CONSENT"] = "true"
 
 strands_agent = Agent(
+    name="Adverse Event Agent",
     model=model,
     description=(
         "An adverse event signal detection agent that analyzes pharmacovigilance data, "

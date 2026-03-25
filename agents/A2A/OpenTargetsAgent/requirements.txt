@@ -1,0 +1,3 @@
+bedrock-agentcore
+strands-agents[a2a]
+mcp>=1.10.0

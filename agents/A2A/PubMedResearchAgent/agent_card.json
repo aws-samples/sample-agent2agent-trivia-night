@@ -9,7 +9,7 @@
         "text"
     ],
     "description": "A deep research agent for generating technical surveys of life science topics based on research from PubMed Central.",
-    "name": "Strands Agents",
+    "name": "PubMed Research Agent",
     "preferredTransport": "JSONRPC",
     "protocolVersion": "0.3.0",
     "skills": [

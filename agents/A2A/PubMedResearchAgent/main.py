@@ -37,6 +37,7 @@ model = BedrockModel(
 os.environ["BYPASS_TOOL_CONSENT"] = "true"
 
 strands_agent = Agent(
+    name="PubMed Research Agent",
     model=model,
     description="A deep research agent for generating technical surveys of life science topics based on research from PubMed Central.",
     tools=[editor, search_pmc_tool, gather_evidence_tool],
