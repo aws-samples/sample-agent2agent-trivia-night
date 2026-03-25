@@ -22,7 +22,8 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
       -rt "PYTHON_3_13" \
       -e main.py \
       -p A2A \
-      -dm
+      -dm \
+      --auto-update-on-conflict
     uv run agentcore deploy
 
 elif [ "$STACK_OPERATION" == "Delete" ]; then
