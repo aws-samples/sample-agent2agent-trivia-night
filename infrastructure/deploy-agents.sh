@@ -2,10 +2,10 @@
 
 STACK_OPERATION=$1
 
-if [[ "$STACK_OPERATION" == "create" || "$STACK_OPERATION" == "update" ]]; then
+if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
     # deploy / update workshop resources
     echo "Hello"
-elif [ "$STACK_OPERATION" == "delete" ]; then
+elif [ "$STACK_OPERATION" == "Delete" ]; then
     # delete workshop resources
     echo "Goodbye"
 else
