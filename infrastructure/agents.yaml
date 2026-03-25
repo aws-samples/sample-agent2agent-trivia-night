@@ -182,7 +182,7 @@ Resources:
                   "mkdir workshop && cd workshop",
                   "git clone --single-branch --branch $REPO_BRANCH_NAME $REPO_URL .",
                   "echo $EVENT_REQUEST_TYPE",
-                  "./infrastructure/deploy-agents.sh $EVENT_REQUEST_TYPE $AGENT_ASSET_BUCKET"
+                  "./infrastructure/deploy-agents.sh $EVENT_REQUEST_TYPE $AGENT_ASSET_BUCKET $REGISTRY_API_URL"
                 ]
               },
               "post_build": {
