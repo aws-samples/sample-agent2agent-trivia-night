@@ -1,0 +1,31 @@
+{
+  "capabilities": {
+    "streaming": true
+  },
+  "defaultInputModes": [
+    "text"
+  ],
+  "defaultOutputModes": [
+    "text"
+  ],
+  "description": "A research agent that searches and analyzes papers from arXiv. Specializes in computational and quantitative research including ML/AI for biology, bioinformatics, statistical methods, protein structure prediction, and biophysics.",
+  "name": "arXiv Research Agent",
+  "preferredTransport": "JSONRPC",
+  "protocolVersion": "0.3.0",
+  "skills": [
+    {
+      "description": "Search arXiv for scientific papers matching a query.\n\nThis tool performs full-text search across arXiv papers including titles,\nabstracts, and metadata. Ideal for finding computational, mathematical,\nand quantitative research including ML/AI for biology, bioinformatics,\nstatistical methods, and biophysics.\n\nReturns:\n    Dictionary with status and content containing formatted paper results\n    including titles, authors, abstracts, arXiv IDs, and PDF links.\n\nExamples:\n    Basic search:\n        search_arxiv_tool(\"protein structure prediction\")\n\n    Search for recent ML papers in biology:\n        search_arxiv_tool(\"deep learning drug discovery\", sort_by=\"submittedDate\")\n\n    Search within a specific category:\n        search_arxiv_tool(\"single cell\", category=\"q-bio.GN\")\n\n    Author search:\n        search_arxiv_tool(\"au:alphafold\", sort_by=\"submittedDate\")",
+      "id": "search_arxiv_tool",
+      "name": "search_arxiv_tool",
+      "tags": []
+    },
+    {
+      "description": "Retrieve full details for a specific arXiv paper by its ID.\n\nFetches complete metadata including title, all authors with affiliations,\nfull abstract, categories, publication dates, and links to PDF and DOI.\n\nReturns:\n    Dictionary with status and content containing the full paper details\n    including abstract, author affiliations, and links.\n\nExamples:\n    Get a paper by ID:\n        get_paper_tool(\"2401.12345\")\n\n    Get a specific version:\n        get_paper_tool(\"2401.12345v2\")",
+      "id": "get_paper_tool",
+      "name": "get_paper_tool",
+      "tags": []
+    }
+  ],
+  "url": "http://127.0.0.1:9000/",
+  "version": "0.0.1"
+}

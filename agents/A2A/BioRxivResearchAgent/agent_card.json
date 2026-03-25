@@ -1,0 +1,31 @@
+{
+  "capabilities": {
+    "streaming": true
+  },
+  "defaultInputModes": [
+    "text"
+  ],
+  "defaultOutputModes": [
+    "text"
+  ],
+  "description": "A research agent that searches and analyzes preprints from bioRxiv and medRxiv. Can find recent preprints by keyword, retrieve full preprint details by DOI, and summarize emerging research before peer-reviewed publication.",
+  "name": "bioRxiv Research Agent",
+  "preferredTransport": "JSONRPC",
+  "protocolVersion": "0.3.0",
+  "skills": [
+    {
+      "description": "Search biorxiv or medrxiv for recent preprints matching a query.\n\nThis tool searches recent preprints by fetching articles from a date range\nand filtering by keyword matches against title and abstract. Ideal for\nfinding the latest research on a topic before peer-reviewed publication.\n\nReturns:\n    Dictionary with status and content containing formatted preprint results\n    including titles, authors, abstracts, DOIs, and publication dates.\n\nExamples:\n    Basic search:\n        search_biorxiv_tool(\"CRISPR gene editing\")\n\n    Search medrxiv for recent clinical trials:\n        search_biorxiv_tool(\"clinical trial GLP-1\", server=\"medrxiv\", days_back=60)\n\n    Search with category filter:\n        search_biorxiv_tool(\"single cell RNA\", category=\"genomics\", days_back=14)",
+      "id": "search_biorxiv_tool",
+      "name": "search_biorxiv_tool",
+      "tags": []
+    },
+    {
+      "description": "Retrieve full details for a specific biorxiv or medrxiv preprint by DOI.\n\nFetches the latest version of a preprint including title, authors,\ncorresponding author, abstract, category, license, and publication status.\n\nReturns:\n    Dictionary with status and content containing the full preprint details\n    including abstract, author information, and publication status.\n\nExamples:\n    Get a biorxiv preprint:\n        get_preprint_tool(\"10.1101/2024.01.15.575789\")\n\n    Get a medrxiv preprint:\n        get_preprint_tool(\"10.1101/2024.03.01.24303456\", server=\"medrxiv\")",
+      "id": "get_preprint_tool",
+      "name": "get_preprint_tool",
+      "tags": []
+    }
+  ],
+  "url": "http://127.0.0.1:9000/",
+  "version": "0.0.1"
+}

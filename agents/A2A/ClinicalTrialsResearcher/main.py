@@ -11,7 +11,7 @@ from visualization_tools import create_pie_chart
 
 # Create unified agent with all tools
 strands_agent = Agent(
-    name="ClinicalTrialsResearcher",
+    name="Clinical Trials Researcher",
     description="A research agent that searches clinical trials on ClinicalTrials.gov, queries FDA-approved drug information from OpenFDA, and creates data visualizations like pie charts.",
     model=MODEL_ID,
     system_prompt=SYSTEM_PROMPT,

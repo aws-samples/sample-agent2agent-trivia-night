@@ -9,7 +9,7 @@
         "text"
     ],
     "description": "A research agent that searches clinical trials on ClinicalTrials.gov, queries FDA-approved drug information from OpenFDA, and creates data visualizations like pie charts.",
-    "name": "ClinicalTrialsResearcher",
+    "name": "Clinical Trials Researcher",
     "preferredTransport": "JSONRPC",
     "protocolVersion": "0.3.0",
     "skills": [
