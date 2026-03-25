@@ -7,30 +7,33 @@ Parameters:
     Type: String
     Default: main
     Description: (Optional) The name of the branch that the CodeBuild project will clone.
-  # ParticipantRoleArn:
-  #   Type: String
-  #   Default: ""
-  #   Description: (Optional) The ARN belonging to the role for whom these resources are being created.
-  # ParticipantAssumedRoleArn:
-  #   Type: String
-  #   Default: ""
-  #   Description: (Optional) The ARN belonging to the assumed role identity for whom these resources are being created.
-  # AssetsBucketName:
-  #   Type: String
-  #   Default: ""
-  #   Description: (Optional) The S3 Bucket containing assets for use by this stack or the resources created by it.
-  # AssetsBucketPrefix:
-  #   Type: String
-  #   Default: ""
-  #   Description: (Optional) The prefix under which the assets are located. (This should end with a "/".)
-  # IsWorkshopStudioEnv:
-  #   Type: String
-  #   Default: "no"
-  #   AllowedValues:
-  #     - "no"
-  #     - "yes"
-  #   Description: (Optional) Whether this stack is being deployed in a Workshop Studio environment or not. If not sure, leave as default of "no".
+  RegistryAPIParameterName:
+    Type: String
+    Default: "/Workshop/platform/us-east-1/api-url"
+    Description: (Optional) Name of the SSM Parameter for the Agent Registry API URL
 Resources:
+  AgentArtifactsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_18
+            comment: Workshop bucket; access logging not required
+          - id: CKV_AWS_21
+            comment: Workshop bucket; versioning not required
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
   WSCodeBuildServiceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -68,7 +71,7 @@ Resources:
                     - ":"
                     - Ref: AWS::AccountId
                     - :log-group:/aws/codebuild/
-                    - Ref: InstallWorkshopStack
+                    - Ref: DeployAgentsProject
               - Fn::Join:
                   - ""
                   - - "arn:"
@@ -78,7 +81,7 @@ Resources:
                     - ":"
                     - Ref: AWS::AccountId
                     - :log-group:/aws/codebuild/
-                    - Ref: InstallWorkshopStack
+                    - Ref: DeployAgentsProject
           - Action:
               - codebuild:CreateReportGroup
               - codebuild:CreateReport
@@ -96,7 +99,7 @@ Resources:
                   - ":"
                   - Ref: AWS::AccountId
                   - :report-group/
-                  - Ref: InstallWorkshopStack
+                  - Ref: DeployAgentsProject
                   - -*
         Version: "2012-10-17"
       PolicyName: WSCodeBuildServiceRoleDefaultPolicy
@@ -135,7 +138,8 @@ Resources:
         Version: "2012-10-17"
       Description: role policy for lambda to trigger codebuild
       Path: /
-  InstallWorkshopStack:
+
+  DeployAgentsProject:
     Type: AWS::CodeBuild::Project
     Properties:
       Artifacts:
@@ -151,26 +155,12 @@ Resources:
             Type: PLAINTEXT
             Value:
               Ref: RepoBranchName
-          # - Name: IS_WORKSHOP_STUDIO_ENV
-          #   Type: PLAINTEXT
-          #   Value:
-          #     Ref: IsWorkshopStudioEnv
-          # - Name: PARTICIPANT_ROLE_ARN
-          #   Type: PLAINTEXT
-          #   Value:
-          #     Ref: ParticipantRoleArn
-          # - Name: PARTICIPANT_ASSUMED_ROLE_ARN
-          #   Type: PLAINTEXT
-          #   Value:
-          #     Ref: ParticipantAssumedRoleArn
-          # - Name: ASSETS_BUCKET_NAME
-          #   Type: PLAINTEXT
-          #   Value:
-          #     Ref: AssetsBucketName
-          # - Name: ASSETS_BUCKET_PREFIX
-          #   Type: PLAINTEXT
-          #   Value:
-          #     Ref: AssetsBucketPrefix
+          - Name: AGENT_ASSET_BUCKET
+            Type: PLAINTEXT
+            Value: !Ref AgentArtifactsBucket
+          - Name: REGISTRY_API_URL
+            Type: PLAINTEXT
+            Value: !Sub "{{resolve:ssm:${RegistryAPIParameterName}}}"
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
         ImagePullCredentialsType: CODEBUILD
         PrivilegedMode: true
@@ -192,7 +182,7 @@ Resources:
                   "mkdir workshop && cd workshop",
                   "git clone --single-branch --branch $REPO_BRANCH_NAME $REPO_URL .",
                   "echo $EVENT_REQUEST_TYPE",
-                  "./infrastructure/deploy-agents.sh $EVENT_REQUEST_TYPE"
+                  "./infrastructure/deploy-agents.sh $EVENT_REQUEST_TYPE $AGENT_ASSET_BUCKET"
                 ]
               },
               "post_build": {
@@ -263,12 +253,10 @@ Resources:
       Environment:
         Variables:
           PROJECT_NAME:
-            Ref: InstallWorkshopStack
+            Ref: DeployAgentsProject
       Handler: index.lambda_handler
       Runtime: python3.11
       Timeout: 900
-    # DependsOn:
-    #   - CodeBuildTriggerLambdaRole
   CustomProvisioningResource:
     Type: AWS::CloudFormation::CustomResource
     Properties:
@@ -278,3 +266,8 @@ Resources:
           - Arn
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
+
+Outputs:
+  AgentArtifactsBucketName:
+    Description: S3 bucket for temporary agent-generated artifacts
+    Value: !Ref AgentArtifactsBucket

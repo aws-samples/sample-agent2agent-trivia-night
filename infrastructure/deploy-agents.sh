@@ -1,6 +1,8 @@
 #!/bin/bash
 
 STACK_OPERATION=$1
+AGENT_ASSET_BUCKET=$2
+REGISTRY_API_URL=$3
 
 # Anchor to the repo root regardless of where this script is invoked from
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -8,7 +10,9 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT/agents/A2A/CalculatorAgent"
 
 if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
-    echo "Hello"
+    echo $STACK_OPERATION
+    echo $AGENT_ASSET_BUCKET
+    echo $REGISTRY_API_URL
     # Install uv and add it to PATH for the rest of this script
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
@@ -25,7 +29,7 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
     uv run agentcore deploy --auto-update-on-conflict
 
 elif [ "$STACK_OPERATION" == "Delete" ]; then
-    echo "Goodbye"
+    echo $STACK_OPERATION
     AGENT_NAME="CalculatorAgent"
     AGENT_RUNTIME_ID=$(aws bedrock-agentcore-control list-agent-runtimes \
       --query "agentRuntimes[?agentRuntimeName=='$AGENT_NAME'].agentRuntimeId" \
