@@ -16,18 +16,21 @@ strands_agent = Agent(
 )
 
 ### A2A Server Content ###
-#  
+#
 # Use the complete runtime URL from environment variable, fallback to local
 runtime_url = os.environ.get("AGENTCORE_RUNTIME_URL", "http://127.0.0.1:9000/")
 logging.info(f"Runtime URL: {runtime_url}")
-host, port = "0.0.0.0", 9000  # nosec B104 — binds all interfaces intentionally; runs inside a container behind AgentCore Runtime proxy
+host, port = (
+    "0.0.0.0",
+    9000,
+)  # nosec B104 — binds all interfaces intentionally; runs inside a container behind AgentCore Runtime proxy
 
 # Pass runtime_url to http_url parameter AND use serve_at_root=True
 a2a_server = A2AServer(
     agent=strands_agent,
     http_url=runtime_url,
     serve_at_root=True,  # Serves locally at root (/) regardless of remote URL path complexity
-    enable_a2a_compliant_streaming=True
+    enable_a2a_compliant_streaming=True,
 )
 
 app = FastAPI()
