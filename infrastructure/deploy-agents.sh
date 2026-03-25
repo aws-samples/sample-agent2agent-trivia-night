@@ -26,7 +26,10 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
       -e main.py \
       -p A2A \
       -dm
-    uv run agentcore deploy --auto-update-on-conflict
+    uv run "$REPO_ROOT/scripts/deploy_and_register.py" \
+      --name "CalculatorAgent" \
+      --description "A simple A2A example with access to a calculator tool." \
+      --api-url "$REGISTRY_API_URL"
 
 elif [ "$STACK_OPERATION" == "Delete" ]; then
     echo $STACK_OPERATION
