@@ -1,0 +1,6 @@
+strands-agents[a2a]
+bedrock_agentcore
+curl-cffi
+httpx
+matplotlib
+boto3
