@@ -44,21 +44,25 @@ strands_agent = Agent(
 )
 
 ### A2A Server Content ###
-#  
+#
 from strands.multiagent.a2a import A2AServer
 import uvicorn
 from fastapi import FastAPI
+
 # Use the complete runtime URL from environment variable, fallback to local
 runtime_url = os.environ.get("AGENTCORE_RUNTIME_URL", "http://127.0.0.1:9000/")
 logging.info(f"Runtime URL: {runtime_url}")
-host, port = "0.0.0.0", 9000  # nosec B104 — binds all interfaces intentionally; runs inside a container behind AgentCore Runtime proxy
+host, port = (
+    "0.0.0.0",
+    9000,
+)  # nosec B104 — binds all interfaces intentionally; runs inside a container behind AgentCore Runtime proxy
 
 # Pass runtime_url to http_url parameter AND use serve_at_root=True
 a2a_server = A2AServer(
     agent=strands_agent,
     http_url=runtime_url,
     serve_at_root=True,  # Serves locally at root (/) regardless of remote URL path complexity
-    enable_a2a_compliant_streaming=True
+    enable_a2a_compliant_streaming=True,
 )
 
 app = FastAPI()
@@ -79,34 +83,3 @@ app.mount("/", a2a_server.to_fastapi_app())
 
 if __name__ == "__main__":
     uvicorn.run(app, host=host, port=port)
-
-
-
-# @app.entrypoint
-# async def strands_agent_bedrock(payload):
-#     """
-#     Invoke the agent with a payload
-#     """
-#     user_input = payload.get("prompt")
-#     print("User input:", user_input)
-#     try:
-#         async for event in strands_agent.stream_async(user_input):
-
-#             # Print tool use
-#             for content in event.get("message", {}).get("content", []):
-#                 if tool_use := content.get("toolUse"):
-#                     yield "\n"
-#                     yield f"🔧 Using tool: {tool_use['name']}"
-#                     for k, v in tool_use["input"].items():
-#                         yield f"**{k}**: {v}\n"
-#                     yield "\n"
-
-#             # Print event data
-#             if "data" in event:
-#                 yield event["data"]
-#     except Exception as e:
-#         yield f"Error: {str(e)}"
-
-
-# if __name__ == "__main__":
-#     app.run()
