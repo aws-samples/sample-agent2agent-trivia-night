@@ -9,12 +9,14 @@ Parameters:
     Type: String
     Default: Workshop
     Description: Cross-stack naming prefix for consistency with existing workshop templates
-  AssetsBucketName:
+  GitHubRepo:
     Type: String
-    Description: Workshop Studio assets S3 bucket name
-  AssetsBucketPrefix:
+    Default: "https://github.com/aws-samples/sample-agent2agent-trivia-night.git"
+    Description: Public GitHub repository URL for platform source code
+  GitHubBranch:
     Type: String
-    Description: Workshop Studio assets S3 bucket prefix
+    Default: main
+    Description: Git branch to use for CodeBuild source
 
 Resources:
   # ===========================================================================
@@ -754,14 +756,6 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - s3:GetObject
-                  - s3:GetBucketLocation
-                  - s3:ListBucket
-                Resource:
-                  - !Sub "arn:${AWS::Partition}:s3:::${AssetsBucketName}"
-                  - !Sub "arn:${AWS::Partition}:s3:::${AssetsBucketName}/*"
-              - Effect: Allow
-                Action:
                   - s3:PutObject
                   - s3:GetObject
                 Resource:
@@ -801,7 +795,7 @@ Resources:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Sub "${AWS::StackName}-lambda-packager"
-      Description: Package Lambda code from platform.zip assets
+      Description: Package Lambda code from GitHub source
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
         Type: NO_ARTIFACTS
@@ -810,29 +804,22 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
         EnvironmentVariables:
-          - Name: ASSETS_BUCKET
-            Value: !Ref AssetsBucketName
-          - Name: ASSETS_PREFIX
-            Value: !Ref AssetsBucketPrefix
           - Name: LAMBDA_BUCKET
             Value: !Ref LambdaCodeBucket
       Source:
-        Type: NO_SOURCE
+        Type: GITHUB
+        Location: !Ref GitHubRepo
+        GitCloneDepth: 1
         BuildSpec: |
           version: 0.2
           phases:
             install:
               runtime-versions:
                 python: 3.12
-            pre_build:
-              commands:
-                - echo "Downloading platform.zip from assets bucket..."
-                - aws s3 cp s3://$ASSETS_BUCKET/${ASSETS_PREFIX}platform.zip /tmp/platform.zip
-                - unzip -o /tmp/platform.zip -d /tmp/source
             build:
               commands:
                 - echo "Installing Python dependencies..."
-                - cd /tmp/source/platform/lambda
+                - cd $CODEBUILD_SRC_DIR/platform/lambda
                 - pip install -r requirements.txt -t src/
                 - echo "Creating Lambda zip..."
                 - cd src && zip -r /tmp/lambda.zip .
@@ -841,6 +828,7 @@ Resources:
                 - echo "Uploading Lambda zip to S3..."
                 - aws s3 cp /tmp/lambda.zip s3://$LAMBDA_BUCKET/lambda.zip
                 - echo "Lambda packaging complete."
+      SourceVersion: !Ref GitHubBranch
       TimeoutInMinutes: 15
 
   # 5.4 - WebUI Builder CodeBuild Project
@@ -848,7 +836,7 @@ Resources:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Sub "${AWS::StackName}-webui-builder"
-      Description: Build React web UI from platform.zip assets
+      Description: Build React web UI from GitHub source
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
         Type: NO_ARTIFACTS
@@ -857,14 +845,12 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
         EnvironmentVariables:
-          - Name: ASSETS_BUCKET
-            Value: !Ref AssetsBucketName
-          - Name: ASSETS_PREFIX
-            Value: !Ref AssetsBucketPrefix
           - Name: WEBUI_BUCKET
             Value: !Ref WebUIBucket
       Source:
-        Type: NO_SOURCE
+        Type: GITHUB
+        Location: !Ref GitHubRepo
+        GitCloneDepth: 1
         BuildSpec: |
           version: 0.2
           phases:
@@ -873,20 +859,16 @@ Resources:
                 nodejs: 20
             pre_build:
               commands:
-                - echo "Downloading platform.zip from assets bucket..."
-                - aws s3 cp s3://$ASSETS_BUCKET/${ASSETS_PREFIX}platform.zip /tmp/platform.zip
-                - unzip -o /tmp/platform.zip -d /tmp/source
-                - cd /tmp/source/platform/web-ui
-                - npm install
+                - cd $CODEBUILD_SRC_DIR/platform/web-ui && npm install
             build:
               commands:
-                - cd /tmp/source/platform/web-ui
-                - npm run build
+                - cd $CODEBUILD_SRC_DIR/platform/web-ui && npm run build
             post_build:
               commands:
                 - echo "Syncing build output to S3..."
-                - aws s3 sync /tmp/source/platform/web-ui/build/ s3://$WEBUI_BUCKET/ --delete
+                - aws s3 sync $CODEBUILD_SRC_DIR/platform/web-ui/build/ s3://$WEBUI_BUCKET/ --delete
                 - echo "WebUI build complete."
+      SourceVersion: !Ref GitHubBranch
       TimeoutInMinutes: 15
 
   # 5.5 - CodeBuild Trigger Lambda Role
