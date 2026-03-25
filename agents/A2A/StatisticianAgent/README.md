@@ -15,7 +15,7 @@ Medical research assistant specialized in survival analysis with biomarkers, exp
 | Variable | Required | Description |
 |---|---|---|
 | `AWS_REGION` | Yes | AWS region for Bedrock and S3 |
-| `STATISTICIAN_S3_BUCKET` | Yes | S3 bucket for storing charts and reading data |
+| `AGENT_ASSET_BUCKET` | Yes | S3 bucket for storing charts and reading data |
 | `STATISTICIAN_EXECUTION_ROLE_ARN` | Yes* | IAM role for CodeInterpreter (*or provide `utils.boto3_helper`) |
 | `AGENTCORE_RUNTIME_URL` | No | Set by AgentCore at deploy time; defaults to `http://127.0.0.1:9000/` |
 

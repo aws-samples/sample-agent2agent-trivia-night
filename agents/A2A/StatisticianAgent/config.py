@@ -2,7 +2,7 @@ import os
 
 MODEL_ID = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
 REGION = os.getenv("AWS_REGION", "us-east-1")
-S3_BUCKET = os.getenv("STATISTICIAN_S3_BUCKET", "")
+S3_BUCKET = os.getenv("AGENT_ASSET_BUCKET", "")
 
 SYSTEM_PROMPT = f"""You are a medical research assistant AI specialized in survival analysis with biomarkers.
 Your primary job is to interpret user queries, run scientific analysis tasks, and provide relevant medical insights

@@ -54,7 +54,7 @@ def _get_execution_role() -> str:
     role_arn = os.getenv("STATISTICIAN_EXECUTION_ROLE_ARN", "")
     if not role_arn:
         try:
-            from utils.boto3_helper import get_role_arn
+            from boto3_helper import get_role_arn
             role_arn = get_role_arn("BedrockAgentCoreStrands")
         except ImportError:
             raise RuntimeError(
