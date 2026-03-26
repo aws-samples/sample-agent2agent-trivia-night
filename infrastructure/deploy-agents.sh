@@ -33,10 +33,10 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
     uv run agentcore deploy --auto-update-on-conflict --env AGENT_ASSET_BUCKET=$AGENT_ASSET_BUCKET
 
     # Get the AgentCore Runtime ARN
-    AGENT_ARN=$(uv run agentcore status -v | jq -r '.agent.agentRuntimeArn')
+    uv run agentcore status -v
+    export AGENT_ARN=$(uv run agentcore status -v | jq -r '.agent.agentRuntimeArn')
 
     # Get the Agent Card
-    cd "$REPO_ROOT/agents/A2A/CalculatorAgent"
     uv run "$REPO_ROOT/scripts/get_agent_card.py"
 
     # uv run "$REPO_ROOT/scripts/deploy_and_register.py" \

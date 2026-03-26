@@ -4,21 +4,22 @@ import requests
 from uuid import uuid4
 from urllib.parse import quote
 
+
 def fetch_agent_card():
     # Get environment variables
-    agent_arn = os.environ.get('AGENT_ARN')
-    bearer_token = os.environ.get('BEARER_TOKEN')
+    agent_arn = os.environ.get("AGENT_ARN")
+    bearer_token = os.environ.get("BEARER_TOKEN")
 
     if not agent_arn:
         print("Error: AGENT_ARN environment variable not set")
         return
 
-    if not bearer_token:
-        print("Error: BEARER_TOKEN environment variable not set")
-        return
+    # if not bearer_token:
+    #     print("Error: BEARER_TOKEN environment variable not set")
+    #     return
 
     # URL encode the agent ARN
-    escaped_agent_arn = quote(agent_arn, safe='')
+    escaped_agent_arn = quote(agent_arn, safe="")
 
     # Construct the URL
     url = f"https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/{escaped_agent_arn}/invocations/.well-known/agent-card.json"
@@ -29,10 +30,13 @@ def fetch_agent_card():
 
     # Set headers
     headers = {
-        'Accept': '*/*',
-        'Authorization': f'Bearer {bearer_token}',
-        'X-Amzn-Bedrock-AgentCore-Runtime-Session-Id': session_id
+        "Accept": "*/*",
+        # 'Authorization': f'Bearer {bearer_token}',
+        "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": session_id,
     }
+
+    if bearer_token:
+        headers["Authorization"] = f"Bearer {bearer_token}"
 
     try:
         # Make the request
@@ -48,6 +52,7 @@ def fetch_agent_card():
     except requests.exceptions.RequestException as e:
         print(f"Error fetching agent card: {e}")
         return None
+
 
 if __name__ == "__main__":
     fetch_agent_card()
