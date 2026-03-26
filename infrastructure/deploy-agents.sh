@@ -26,52 +26,53 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
     export BEARER_TOKEN=$(echo "$M2M_TOKEN" | jq -r '.access_token')
 
     # This is where we'll eventually iterate over multiple agents
-    AGENT_NAME="CalculatorAgent"
-    cd "$REPO_ROOT/agents/A2A/$AGENT_NAME"
+    for AGENT_NAME in ArXivResearchAgent CalculatorAgent NYCTransitAgent; do
+        cd "$REPO_ROOT/agents/A2A/$AGENT_NAME"
 
-    # Configure agent for A2A protocol
-    uv run --with bedrock-agentcore-starter-toolkit agentcore configure \
-      --non-interactive \
-      -n $AGENT_NAME \
-      -rf requirements.txt \
-      -dt "direct_code_deploy" \
-      -rt "PYTHON_3_13" \
-      -e main.py \
-      -p A2A \
-      -dm \
-      --authorizer-config "{
-        \"customJWTAuthorizer\": {
-          \"discoveryUrl\": \"$DISCOVERY_URL\",
-          \"allowedClients\": [\"$CLIENT_ID\"]
-        }
-      }"
-    
-    # Deploy to AgentCore Runtime
-    uv run agentcore deploy --auto-update-on-conflict --env AGENT_ASSET_BUCKET=$AGENT_ASSET_BUCKET
+        # Configure agent for A2A protocol
+        uv run --with bedrock-agentcore-starter-toolkit agentcore configure \
+          --non-interactive \
+          -n $AGENT_NAME \
+          -rf requirements.txt \
+          -dt "direct_code_deploy" \
+          -rt "PYTHON_3_13" \
+          -e main.py \
+          -p A2A \
+          -dm \
+          --authorizer-config "{
+            \"customJWTAuthorizer\": {
+              \"discoveryUrl\": \"$DISCOVERY_URL\",
+              \"allowedClients\": [\"$CLIENT_ID\"]
+            }
+          }"
+        
+        # Deploy to AgentCore Runtime
+        uv run agentcore deploy --auto-update-on-conflict --env AGENT_ASSET_BUCKET=$AGENT_ASSET_BUCKET
 
-    # Get the AgentCore Runtime ARN 
-    export AGENT_ARN=$(grep 'agent_arn:' .bedrock_agentcore.yaml | awk '{print $2}')
+        # Get the AgentCore Runtime ARN 
+        export AGENT_ARN=$(grep 'agent_arn:' .bedrock_agentcore.yaml | awk '{print $2}')
 
-    # Get the Agent Card and register it
-    AGENT_CARD=$(uv run "$REPO_ROOT/scripts/get_agent_card.py")
-    echo "$AGENT_CARD" | uv run "$REPO_ROOT/scripts/register_a2a.py" --api-url "$REGISTRY_API_URL"
+        # Get the Agent Card and register it
+        AGENT_CARD=$(uv run "$REPO_ROOT/scripts/get_agent_card.py")
+        echo "$AGENT_CARD" | uv run "$REPO_ROOT/scripts/register_a2a.py" --api-url "$REGISTRY_API_URL"
+    done
 
 elif [ "$STACK_OPERATION" == "Delete" ]; then
     echo $STACK_OPERATION
-    # This is where we'll eventually iterate over multiple agents
-    AGENT_NAME="CalculatorAgent"
-    cd "$REPO_ROOT/agents/A2A/$AGENT_NAME"
     
-    AGENT_RUNTIME_ID=$(aws bedrock-agentcore-control list-agent-runtimes \
-      --query "agentRuntimes[?agentRuntimeName=='$AGENT_NAME'].agentRuntimeId" \
-      --output text)
-    if [ -n "$AGENT_RUNTIME_ID" ] && [ "$AGENT_RUNTIME_ID" != "None" ]; then
-        echo "Deleting agent runtime: $AGENT_RUNTIME_ID"
-        aws bedrock-agentcore-control delete-agent-runtime --agent-runtime-id "$AGENT_RUNTIME_ID"
-        echo "Deleted $AGENT_NAME ($AGENT_RUNTIME_ID)"
-    else
-        echo "No agent runtime found with name '$AGENT_NAME', skipping delete."
-    fi
+    # This is where we'll eventually iterate over multiple agents
+    for AGENT_NAME in ArXivResearchAgent CalculatorAgent NYCTransitAgent; do
+        AGENT_RUNTIME_ID=$(aws bedrock-agentcore-control list-agent-runtimes \
+          --query "agentRuntimes[?agentRuntimeName=='$AGENT_NAME'].agentRuntimeId" \
+          --output text)
+        if [ -n "$AGENT_RUNTIME_ID" ] && [ "$AGENT_RUNTIME_ID" != "None" ]; then
+            echo "Deleting agent runtime: $AGENT_RUNTIME_ID"
+            aws bedrock-agentcore-control delete-agent-runtime --agent-runtime-id "$AGENT_RUNTIME_ID"
+            echo "Deleted $AGENT_NAME ($AGENT_RUNTIME_ID)"
+        else
+            echo "No agent runtime found with name '$AGENT_NAME', skipping delete."
+        fi
+    done
 
 else
     echo "Invalid stack operation!"
