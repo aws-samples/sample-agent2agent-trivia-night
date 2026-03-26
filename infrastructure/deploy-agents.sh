@@ -13,10 +13,18 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
     echo $STACK_OPERATION
     echo $AGENT_ASSET_BUCKET
     echo $REGISTRY_API_URL
+
     # Install uv and add it to PATH for the rest of this script
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
     uv --version
+
+    # Get Cognito information
+    uv run "$REPO_ROOT/scripts/get_m2m_token.py" > /tmp/m2m_token.json
+    export DISCOVERY_URL=$(jq -r '.discovery_url' /tmp/m2m_token.json)
+    export CLIENT_ID=$(jq -r '.client_id' /tmp/m2m_token.json)
+    export CLIENT_SECRET=$(jq -r '.client_secret' /tmp/m2m_token.json)
+    export BEARER_TOKEN=$(jq -r '.access_token' /tmp/m2m_token.json)
 
     # Configure agent for A2A protocol
     uv run --with bedrock-agentcore-starter-toolkit agentcore configure \
@@ -27,19 +35,20 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
       -rt "PYTHON_3_13" \
       -e main.py \
       -p A2A \
-      -dm
+      -dm \
+      --authorizer-config "{
+        \"customJWTAuthorizer\": {
+          \"discoveryUrl\": \"$DISCOVERY_URL\",
+          \"allowedClients\": [\"$CLIENT_ID\"]
+        }
+      }"
     
     # Deploy to AgentCore Runtime
     uv run agentcore deploy --auto-update-on-conflict --env AGENT_ASSET_BUCKET=$AGENT_ASSET_BUCKET
-    echo "Getting Agent ARN"
-    ls .
-    cat .bedrock_agentcore.yaml
 
-    # Get the AgentCore Runtime ARN from the config file written by agentcore deploy
-    # export AGENT_ARN=$(yq '.agents.CalculatorAgent.bedrock_agentcore.agent_arn' .bedrock_agentcore.yaml)
+    # Get the AgentCore Runtime ARN 
     export AGENT_ARN=$(grep 'agent_arn:' .bedrock_agentcore.yaml | awk '{print $2}')
 
-    echo $AGENT_ARN
     # Get the Agent Card
     uv run "$REPO_ROOT/scripts/get_agent_card.py"
 

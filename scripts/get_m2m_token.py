@@ -46,7 +46,9 @@ def fetch_token(token_endpoint: str, client_id: str, client_secret: str) -> str:
         },
         method="POST",
     )
-    with urllib.request.urlopen(req) as resp:  # nosec B310 — URL is constructed from a hardcoded HTTPS Cognito domain, not user input
+    with urllib.request.urlopen(
+        req
+    ) as resp:  # nosec B310 — URL is constructed from a hardcoded HTTPS Cognito domain, not user input
         return json.loads(resp.read().decode())["access_token"]
 
 
@@ -73,8 +75,6 @@ def main():
     args = parser.parse_args()
     ssm = boto3.client("ssm", region_name=args.region)
 
-    print("=== Fetching Parameters ===")
-
     try:
         client_id = get_ssm_param(ssm, f"{args.ssm_prefix}/m2m_client_id")
         client_secret = get_encrypted_ssm_param(
@@ -86,7 +86,6 @@ def main():
         print(f"ERROR: Failed to read SSM parameters: {e}", file=sys.stderr)
         sys.exit(1)
 
-    print("=== Fetching Bearer Token ===")
     try:
         token = get_m2m_bearer_token(
             client_id, client_secret, user_pool_domain, args.region
@@ -94,12 +93,15 @@ def main():
     except Exception as e:
         print(f"ERROR: Failed to fetch token: {e}", file=sys.stderr)
         sys.exit(1)
-    print("Token acquired.\n")
 
-    print(f"Discovery URL:  {discovery_url}")
-    print(f"Client ID:      {client_id}")
-    print(f"Client Secret:  {client_secret}")
-    print(f"Access Token:   {token}")
+    output = {
+        "discovery_url": discovery_url,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "access_token": token,
+    }
+
+    print(json.dumps(output))
 
 
 if __name__ == "__main__":

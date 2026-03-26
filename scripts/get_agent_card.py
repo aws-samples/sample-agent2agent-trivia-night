@@ -14,9 +14,9 @@ def fetch_agent_card():
         print("Error: AGENT_ARN environment variable not set")
         return
 
-    # if not bearer_token:
-    #     print("Error: BEARER_TOKEN environment variable not set")
-    #     return
+    if not bearer_token:
+        print("Error: BEARER_TOKEN environment variable not set")
+        return
 
     # URL encode the agent ARN
     escaped_agent_arn = quote(agent_arn, safe="")
@@ -31,12 +31,12 @@ def fetch_agent_card():
     # Set headers
     headers = {
         "Accept": "*/*",
-        # 'Authorization': f'Bearer {bearer_token}',
+        'Authorization': f'Bearer {bearer_token}',
         "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": session_id,
     }
 
-    if bearer_token:
-        headers["Authorization"] = f"Bearer {bearer_token}"
+    # if bearer_token:
+    #     headers["Authorization"] = f"Bearer {bearer_token}"
 
     try:
         # Make the request
