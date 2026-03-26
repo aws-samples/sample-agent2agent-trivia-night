@@ -26,17 +26,13 @@ def fetch_agent_card():
 
     # Generate a unique session ID
     session_id = str(uuid4())
-    print(f"Generated session ID: {session_id}")
 
     # Set headers
     headers = {
         "Accept": "*/*",
-        'Authorization': f'Bearer {bearer_token}',
+        "Authorization": f"Bearer {bearer_token}",
         "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": session_id,
     }
-
-    # if bearer_token:
-    #     headers["Authorization"] = f"Bearer {bearer_token}"
 
     try:
         # Make the request

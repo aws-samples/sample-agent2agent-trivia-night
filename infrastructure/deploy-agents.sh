@@ -20,11 +20,11 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
     uv --version
 
     # Get Cognito information
-    uv run "$REPO_ROOT/scripts/get_m2m_token.py" > /tmp/m2m_token.json
-    export DISCOVERY_URL=$(jq -r '.discovery_url' /tmp/m2m_token.json)
-    export CLIENT_ID=$(jq -r '.client_id' /tmp/m2m_token.json)
-    export CLIENT_SECRET=$(jq -r '.client_secret' /tmp/m2m_token.json)
-    export BEARER_TOKEN=$(jq -r '.access_token' /tmp/m2m_token.json)
+    M2M_TOKEN=$(uv run "$REPO_ROOT/scripts/get_m2m_token.py")
+    export DISCOVERY_URL=$(echo "$M2M_TOKEN" | jq -r '.discovery_url')
+    export CLIENT_ID=$(echo "$M2M_TOKEN" | jq -r '.client_id')
+    export CLIENT_SECRET=$(echo "$M2M_TOKEN" | jq -r '.client_secret')
+    export BEARER_TOKEN=$(echo "$M2M_TOKEN" | jq -r '.access_token')
 
     # Configure agent for A2A protocol
     uv run --with bedrock-agentcore-starter-toolkit agentcore configure \
@@ -50,7 +50,8 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
     export AGENT_ARN=$(grep 'agent_arn:' .bedrock_agentcore.yaml | awk '{print $2}')
 
     # Get the Agent Card
-    uv run "$REPO_ROOT/scripts/get_agent_card.py"
+    AGENT_CARD=$(uv run "$REPO_ROOT/scripts/get_agent_card.py")
+    echo $AGENT_CARD
 
     # uv run "$REPO_ROOT/scripts/deploy_and_register.py" \
     #   --name "CalculatorAgent" \
