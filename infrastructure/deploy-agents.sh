@@ -36,7 +36,9 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
     cat .bedrock_agentcore.yaml
 
     # Get the AgentCore Runtime ARN from the config file written by agentcore deploy
-    export AGENT_ARN=$(yq '.agents.CalculatorAgent.bedrock_agentcore.agent_arn' .bedrock_agentcore.yaml)
+    # export AGENT_ARN=$(yq '.agents.CalculatorAgent.bedrock_agentcore.agent_arn' .bedrock_agentcore.yaml)
+    export AGENT_ARN=$(grep 'agent_arn:' .bedrock_agentcore.yaml | awk '{print $2}')
+
     echo $AGENT_ARN
     # Get the Agent Card
     uv run "$REPO_ROOT/scripts/get_agent_card.py"
