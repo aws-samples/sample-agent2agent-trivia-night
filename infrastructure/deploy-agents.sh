@@ -25,8 +25,11 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
     export CLIENT_SECRET=$(echo "$M2M_TOKEN" | jq -r '.client_secret')
     export BEARER_TOKEN=$(echo "$M2M_TOKEN" | jq -r '.access_token')
 
-    # This is where we'll eventually iterate over multiple agents
-    for AGENT_NAME in ArXivResearchAgent CalculatorAgent NYCTransitAgent; do
+    # Iterate over all agents in agents/A2A, skipping hidden folders
+    for AGENT_DIR in "$REPO_ROOT/agents/A2A"/*/; do
+        AGENT_NAME=$(basename "$AGENT_DIR")
+        [[ "$AGENT_NAME" == .* ]] && continue
+        echo "Deploying $AGENT_NAME"
         cd "$REPO_ROOT/agents/A2A/$AGENT_NAME"
 
         # Configure agent for A2A protocol
@@ -60,8 +63,11 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
 elif [ "$STACK_OPERATION" == "Delete" ]; then
     echo $STACK_OPERATION
     
-    # This is where we'll eventually iterate over multiple agents
-    for AGENT_NAME in ArXivResearchAgent CalculatorAgent NYCTransitAgent; do
+    # Iterate over all agents in agents/A2A, skipping hidden folders
+    for AGENT_DIR in "$REPO_ROOT/agents/A2A"/*/; do
+        AGENT_NAME=$(basename "$AGENT_DIR")
+        [[ "$AGENT_NAME" == .* ]] && continue
+        echo "Deleting $AGENT_NAME"
         AGENT_RUNTIME_ID=$(aws bedrock-agentcore-control list-agent-runtimes \
           --query "agentRuntimes[?agentRuntimeName=='$AGENT_NAME'].agentRuntimeId" \
           --output text)
