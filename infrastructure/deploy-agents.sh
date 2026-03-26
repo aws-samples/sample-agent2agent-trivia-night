@@ -34,7 +34,7 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
 
     # Get the AgentCore Runtime ARN
     uv run agentcore status -v
-    export AGENT_ARN=$(uv run agentcore status -v | jq -r '.agent.agentRuntimeArn')
+    export AGENT_ARN=$(uv run agentcore status -v 2>/dev/null | uv run python -c "import sys,json; print(json.load(sys.stdin)['agent']['agentRuntimeArn'])")
 
     # Get the Agent Card
     uv run "$REPO_ROOT/scripts/get_agent_card.py"
