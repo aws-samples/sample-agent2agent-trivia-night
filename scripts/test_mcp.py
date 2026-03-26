@@ -20,6 +20,7 @@ from mcp.client.streamable_http import streamablehttp_client
 
 from get_m2m_token import (
     get_ssm_param,
+    get_encrypted_ssm_param,
     get_m2m_client_secret,
     fetch_token,
     get_m2m_bearer_token,
@@ -68,12 +69,31 @@ async def run(bearer_token: str):
 def main():
     parser = argparse.ArgumentParser(description="Test AgentCore MCP server with OAuth")
     parser.add_argument("--pool-name", default="CognitoUserPool")
+    parser.add_argument(
+        "--ssm-prefix",
+        default="/Workshop/platform",
+        help="SSM prefix (must start with /)",
+    )
     parser.add_argument("--region", default=os.getenv("AWS_REGION", "us-east-1"))
     args = parser.parse_args()
+    ssm = boto3.client("ssm", region_name=args.region)
+
+    try:
+        client_id = get_ssm_param(ssm, f"{args.ssm_prefix}/m2m_client_id")
+        client_secret = get_encrypted_ssm_param(
+            ssm, f"{args.ssm_prefix}/m2m_client_secret"
+        )
+        discovery_url = get_ssm_param(ssm, f"{args.ssm_prefix}/cognito_discovery_url")
+        user_pool_domain = get_ssm_param(ssm, f"{args.ssm_prefix}/user_pool_domain")
+    except Exception as e:
+        print(f"ERROR: Failed to read SSM parameters: {e}", file=sys.stderr)
+        sys.exit(1)
 
     print("=== Fetching Bearer Token ===")
     try:
-        token = get_m2m_bearer_token(args.pool_name, args.region)
+        token = get_m2m_bearer_token(
+            client_id, client_secret, user_pool_domain, args.region
+        )
     except Exception as e:
         print(f"ERROR: Failed to fetch token: {e}", file=sys.stderr)
         sys.exit(1)
