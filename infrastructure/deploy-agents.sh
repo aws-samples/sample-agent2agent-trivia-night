@@ -35,12 +35,11 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
     ls .
     cat .bedrock_agentcore.yaml
 
-    # Get the AgentCore Runtime ARN
-    uv run agentcore status -v > /tmp/agentcore_status.json 2>/dev/null
-    # export AGENT_ARN=$(uv run python -c "import json; print(json.load(open('/tmp/agentcore_status.json'))['agent']['agentRuntimeArn'])")
-    # export AGENT_ARN=$(jq -r '.agent.agentRuntimeArn' /tmp/agentcore_status.json)
+    # Get the AgentCore Runtime ARN from the config file written by agentcore deploy
+    export AGENT_ARN=$(yq '.agents.CalculatorAgent.bedrock_agentcore.agent_arn' .bedrock_agentcore.yaml)
+    echo $AGENT_ARN
     # Get the Agent Card
-    # uv run "$REPO_ROOT/scripts/get_agent_card.py"
+    uv run "$REPO_ROOT/scripts/get_agent_card.py"
 
     # uv run "$REPO_ROOT/scripts/deploy_and_register.py" \
     #   --name "CalculatorAgent" \
