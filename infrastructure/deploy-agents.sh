@@ -57,6 +57,7 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
 
         # Get the Agent Card and register it
         AGENT_CARD=$(uv run "$REPO_ROOT/scripts/get_agent_card.py")
+        echo $AGENT_CARD
         echo "$AGENT_CARD" | uv run "$REPO_ROOT/scripts/register_a2a.py" --api-url "$REGISTRY_API_URL"
     done
 
