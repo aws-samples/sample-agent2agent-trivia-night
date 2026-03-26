@@ -17,6 +17,8 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
     uv --version
+
+    # Configure agent for A2A protocol
     uv run --with bedrock-agentcore-starter-toolkit agentcore configure \
       --non-interactive \
       -n CalculatorAgent \
@@ -26,7 +28,17 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
       -e main.py \
       -p A2A \
       -dm
-    uv run agentcore deploy --env AGENT_ASSET_BUCKET=$AGENT_ASSET_BUCKET
+    
+    # Deploy to AgentCore Runtime
+    uv run agentcore deploy --auto-update-on-conflict --env AGENT_ASSET_BUCKET=$AGENT_ASSET_BUCKET
+
+    # Get the AgentCore Runtime ARN
+    AGENT_ARN=$(uv run agentcore status -v | jq -r '.agent.agentRuntimeArn')
+
+    # Get the Agent Card
+    cd "$REPO_ROOT/agents/A2A/CalculatorAgent"
+    uv run "$REPO_ROOT/scripts/get_agent_card.py"
+
     # uv run "$REPO_ROOT/scripts/deploy_and_register.py" \
     #   --name "CalculatorAgent" \
     #   --description "A simple A2A example with access to a calculator tool." \
