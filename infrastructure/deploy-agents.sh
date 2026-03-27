@@ -61,6 +61,22 @@ if [[ "$STACK_OPERATION" == "Create" || "$STACK_OPERATION" == "Update" ]]; then
         echo "$AGENT_CARD" | uv run "$REPO_ROOT/scripts/register_a2a.py" --api-url "$REGISTRY_API_URL"
     done
 
+    # Register the OrchestratorAgent (deployed separately, HTTP protocol)
+    ORCHESTRATOR_ARN=$(aws bedrock-agentcore-control list-agent-runtimes \
+      --query "agentRuntimes[?contains(agentRuntimeName,'OrchestratorAgent')].agentRuntimeArn | [0]" \
+      --output text 2>/dev/null)
+    if [ -n "$ORCHESTRATOR_ARN" ] && [ "$ORCHESTRATOR_ARN" != "None" ]; then
+        echo "Registering OrchestratorAgent ($ORCHESTRATOR_ARN)"
+        uv run "$REPO_ROOT/scripts/register_agent.py" \
+          --name "OrchestratorAgent" \
+          --description "An orchestrator agent that coordinates multiple specialized agents to answer complex questions." \
+          --arn "$ORCHESTRATOR_ARN" \
+          --skills "orchestration,multi-agent,coordination" \
+          --api-url "$REGISTRY_API_URL"
+    else
+        echo "OrchestratorAgent not found in AgentCore Runtime, skipping registration."
+    fi
+
 elif [ "$STACK_OPERATION" == "Delete" ]; then
     echo $STACK_OPERATION
     

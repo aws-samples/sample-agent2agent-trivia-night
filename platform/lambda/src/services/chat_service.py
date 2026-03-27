@@ -39,7 +39,7 @@ class AgentUnreachableError(ChatServiceError):
 class ChatService:
     """Invokes registered agents via HTTP with Cognito bearer token."""
 
-    INVOCATION_TIMEOUT = 25
+    INVOCATION_TIMEOUT = 28
 
     def __init__(self, agent_service: Optional[AgentService] = None) -> None:
         self.agent_service = agent_service or AgentService()
@@ -107,6 +107,15 @@ class ChatService:
 
         if not agent_url:
             raise AgentUnreachableError("Agent has no registered URL", {"agent_id": agent_id})
+
+        # Convert ARN to invocation URL if needed
+        if agent_url.startswith("arn:"):
+            from urllib.parse import quote
+            # Extract region from ARN: arn:aws:bedrock-agentcore:REGION:ACCOUNT:runtime/ID
+            arn_parts = agent_url.split(":")
+            region = arn_parts[3] if len(arn_parts) > 3 else self._default_region
+            encoded_arn = quote(agent_url, safe="")
+            agent_url = f"https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{encoded_arn}/invocations/"
 
         logger.info(f"Agent URL: {agent_url}")
 
