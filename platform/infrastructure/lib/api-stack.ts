@@ -131,6 +131,13 @@ export class ApiStack extends cdk.Stack {
               actions: ["sts:GetCallerIdentity"],
               resources: ["*"],
             }),
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: ["ssm:GetParameter"],
+              resources: [
+                `arn:aws:ssm:${this.region}:${this.account}:parameter/Workshop/platform/*`,
+              ],
+            }),
           ],
         }),
       },
@@ -354,6 +361,14 @@ export class ApiStack extends cdk.Stack {
           reason:
             "sts:GetCallerIdentity requires Resource::* as it does not support resource-level permissions. Used to determine account ID for ARN construction.",
           appliesTo: ["Resource::*"],
+        },
+        {
+          id: "AwsSolutions-IAM5",
+          reason:
+            "SSM wildcard scoped to /Workshop/platform/* prefix. Lambda reads M2M credentials for Cognito bearer token auth to invoke agents.",
+          appliesTo: [
+            `Resource::arn:aws:ssm:${this.region}:${this.account}:parameter/Workshop/platform/*`,
+          ],
         },
       ],
       true
