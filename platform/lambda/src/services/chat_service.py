@@ -1,13 +1,16 @@
 """
 Chat service for invoking registered agents.
 
-Uses the boto3 bedrock-agentcore client's invoke_agent_runtime API
-to communicate with agents deployed on AgentCore Runtime.
+Uses HTTP requests with Cognito M2M bearer tokens to communicate
+with agents deployed on AgentCore Runtime.
 """
+import base64
 import json
 import os
 import uuid
 from typing import Any, Dict, Optional
+from urllib.request import Request, urlopen
+from urllib.parse import urlencode
 
 import boto3
 
@@ -34,69 +37,68 @@ class AgentUnreachableError(ChatServiceError):
 
 
 class ChatService:
-    """Invokes registered agents via AgentCore Runtime API."""
+    """Invokes registered agents via HTTP with Cognito bearer token."""
 
     INVOCATION_TIMEOUT = 25
 
     def __init__(self, agent_service: Optional[AgentService] = None) -> None:
         self.agent_service = agent_service or AgentService()
         self._default_region = os.environ.get("AWS_REGION", "us-east-1")
-        self._agentcore_clients: dict = {}
+        self._ssm_prefix = os.environ.get("SSM_PREFIX", "/Workshop/platform")
+        self._bearer_token = None
+        self._ssm = boto3.client("ssm", region_name=self._default_region)
+        self._cognito = boto3.client("cognito-idp", region_name=self._default_region)
         logger.info("Initialised ChatService")
 
-    def _get_agentcore_client(self, region: str):
-        """Get or create a bedrock-agentcore client for the given region."""
-        if region not in self._agentcore_clients:
-            self._agentcore_clients[region] = boto3.client(
-                "bedrock-agentcore", region_name=region
-            )
-        return self._agentcore_clients[region]
+    def _get_bearer_token(self) -> str:
+        """Get a Cognito M2M bearer token using client_credentials flow."""
+        if self._bearer_token:
+            return self._bearer_token
 
-    def _region_from_arn(self, arn: str) -> str:
-        """Extract region from an ARN like arn:aws:bedrock-agentcore:us-east-1:..."""
-        parts = arn.split(":")
-        if len(parts) >= 4 and parts[3]:
-            return parts[3]
-        return self._default_region
+        client_id = self._ssm.get_parameter(Name=f"{self._ssm_prefix}/m2m_client_id")["Parameter"]["Value"]
+        client_secret = self._ssm.get_parameter(Name=f"{self._ssm_prefix}/m2m_client_secret", WithDecryption=True)["Parameter"]["Value"]
+        domain = self._ssm.get_parameter(Name=f"{self._ssm_prefix}/user_pool_domain")["Parameter"]["Value"]
+
+        token_url = f"https://{domain}.auth.{self._default_region}.amazoncognito.com/oauth2/token"
+        credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+
+        req = Request(
+            token_url,
+            data=b"grant_type=client_credentials",
+            headers={
+                "Authorization": f"Basic {credentials}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            method="POST",
+        )
+        with urlopen(req, timeout=10) as resp:  # nosec B310
+            self._bearer_token = json.loads(resp.read().decode())["access_token"]
+
+        return self._bearer_token
 
     def _extract_arn_from_url(self, url: str) -> Optional[str]:
         """Extract the AgentCore Runtime ARN from a registered URL.
 
-        URLs registered by our scripts look like:
-        https://bedrock-agentcore.us-east-1.amazonaws.com/runtime/<id>/runtime-endpoint/DEFAULT
-
-        The ARN is: arn:aws:bedrock-agentcore:<region>:<account>:runtime/<id>
+        URLs look like:
+        https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/arn%3Aaws%3Abedrock-agentcore%3A.../invocations/
         """
         if "bedrock-agentcore" not in url:
             return None
 
-        # Try to extract runtime ID from URL path
-        parts = url.rstrip("/").split("/")
-        try:
-            runtime_idx = parts.index("runtime")
-            runtime_id = parts[runtime_idx + 1]
-        except (ValueError, IndexError):
-            return None
+        from urllib.parse import unquote
 
-        # Get region from URL hostname
-        # e.g. bedrock-agentcore.us-east-1.amazonaws.com
-        try:
-            hostname = url.split("//")[1].split("/")[0]
-            region = hostname.split(".")[1]
-        except (IndexError, AttributeError):
-            region = os.environ.get("AWS_REGION", "us-east-1")
+        # The URL contains a URL-encoded ARN between /runtimes/ and /invocations/
+        decoded = unquote(url)
+        # Look for ARN pattern in the decoded URL
+        import re
+        match = re.search(r'(arn:aws:bedrock-agentcore:[^:]+:[^:]+:runtime/[^/]+)', decoded)
+        if match:
+            return match.group(1)
 
-        # Get account ID from STS
-        try:
-            sts = boto3.client("sts")
-            account_id = sts.get_caller_identity()["Account"]
-        except Exception:
-            account_id = "unknown"
-
-        return f"arn:aws:bedrock-agentcore:{region}:{account_id}:runtime/{runtime_id}"
+        return None
 
     def invoke_agent(self, agent_id: str, message: str) -> Dict[str, Any]:
-        """Look up an agent and invoke it via AgentCore Runtime API."""
+        """Look up an agent and invoke it via HTTP with bearer token."""
         logger.info(f"Invoking agent agent_id={agent_id}")
 
         agent = self.agent_service.get_agent(agent_id)
@@ -106,69 +108,69 @@ class ChatService:
         if not agent_url:
             raise AgentUnreachableError("Agent has no registered URL", {"agent_id": agent_id})
 
-        logger.info(f"Agent URL/ARN: {agent_url}")
-
-        # If the url field is already an ARN, use it directly
-        if agent_url.startswith("arn:aws:bedrock-agentcore:"):
-            agent_arn = agent_url
-        else:
-            agent_arn = self._extract_arn_from_url(agent_url)
-
-        if not agent_arn:
-            raise AgentUnreachableError(
-                "Could not determine AgentCore Runtime ARN from agent URL",
-                {"agent_id": agent_id, "agent_url": agent_url},
-            )
-
-        logger.info(f"Using AgentCore ARN: {agent_arn}")
-
-        # Use a client in the same region as the agent
-        agent_region = self._region_from_arn(agent_arn)
-        client = self._get_agentcore_client(agent_region)
-        logger.info(f"Using AgentCore region: {agent_region}")
+        logger.info(f"Agent URL: {agent_url}")
 
         try:
-            payload = json.dumps({"prompt": message}).encode()
+            bearer_token = self._get_bearer_token()
             session_id = str(uuid.uuid4())
 
-            response = client.invoke_agent_runtime(
-                agentRuntimeArn=agent_arn,
-                runtimeSessionId=session_id,
-                payload=payload,
+            payload = json.dumps({
+                "jsonrpc": "2.0",
+                "method": "message/send",
+                "id": session_id,
+                "params": {
+                    "message": {
+                        "role": "user",
+                        "parts": [{"kind": "text", "text": message}],
+                        "messageId": str(uuid.uuid4()),
+                    },
+                    "configuration": {"acceptedOutputModes": ["text"]},
+                },
+            })
+
+            req = Request(
+                agent_url,
+                data=payload.encode(),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {bearer_token}",
+                    "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": session_id,
+                },
+                method="POST",
             )
 
-            # Read the response blob
-            raw_response = response.get("response")
-            if hasattr(raw_response, "read"):
-                # StreamingBody — read all bytes
-                response_bytes = raw_response.read()
-            elif isinstance(raw_response, bytes):
-                response_bytes = raw_response
-            else:
-                response_bytes = str(raw_response).encode("utf-8") if raw_response else b""
+            with urlopen(req, timeout=self.INVOCATION_TIMEOUT) as resp:  # nosec B310
+                response_text = resp.read().decode("utf-8")
 
-            response_text = response_bytes.decode("utf-8")
+            # Parse JSONRPC response
+            try:
+                parsed = json.loads(response_text)
+                if "result" in parsed:
+                    result = parsed["result"]
+                    # Extract text from A2A message parts
+                    parts = []
+                    for artifact in result.get("artifacts", []):
+                        for part in artifact.get("parts", []):
+                            if part.get("kind") == "text":
+                                parts.append(part["text"])
+                    if parts:
+                        response_text = "\n".join(parts)
+                    elif isinstance(result, str):
+                        response_text = result
+            except (json.JSONDecodeError, ValueError):
+                pass
 
-            # Parse SSE data frames if present (data: "chunk" format)
+            # Parse SSE data frames if present
             if response_text.strip().startswith("data:"):
                 parts = []
                 for line in response_text.split("\n"):
                     line = line.strip()
                     if line.startswith("data:"):
                         chunk = line[5:].strip()
-                        # Remove surrounding quotes if present
                         if chunk.startswith('"') and chunk.endswith('"'):
                             chunk = json.loads(chunk)
                         parts.append(chunk)
                 response_text = "".join(parts)
-            else:
-                # Try to parse as JSON and extract the text
-                try:
-                    parsed = json.loads(response_text)
-                    if isinstance(parsed, dict):
-                        response_text = parsed.get("response", parsed.get("output", response_text))
-                except (json.JSONDecodeError, ValueError):
-                    pass
 
             logger.info(f"Agent responded agent_id={agent_id} len={len(response_text)}")
 
@@ -178,21 +180,11 @@ class ChatService:
                 "agentName": agent_name,
             }
 
-        except client.exceptions.ResourceNotFoundException:
-            raise AgentUnreachableError(
-                f"Agent runtime not found: {agent_arn}",
-                {"agent_id": agent_id, "agent_arn": agent_arn},
-            )
-        except client.exceptions.AccessDeniedException as e:
-            raise AgentUnreachableError(
-                f"Access denied invoking agent: {e}",
-                {"agent_id": agent_id, "agent_arn": agent_arn},
-            )
         except Exception as e:
             logger.error(f"Error invoking agent agent_id={agent_id}: {e}")
+            # Clear cached token in case it expired
+            self._bearer_token = None
             raise AgentUnreachableError(
                 f"Failed to invoke agent: {e}",
                 {"agent_id": agent_id, "agent_url": agent_url},
             )
-
-# Force CDK asset hash change - v4 SSE parsing fix 2026-03-07
