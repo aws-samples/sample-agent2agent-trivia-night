@@ -1,0 +1,63 @@
+{
+    "capabilities": {
+        "streaming": true
+    },
+    "defaultInputModes": ["text"],
+    "defaultOutputModes": ["text"],
+    "description": "A patent research agent that searches USPTO Patent Public Search (ppubs.uspto.gov) for granted patents, published applications, and patent documents.",
+    "name": "USPTO Patent Agent",
+    "preferredTransport": "JSONRPC",
+    "protocolVersion": "0.3.0",
+    "skills": [
+        {
+            "id": "ppubs_search_patents",
+            "name": "ppubs_search_patents",
+            "description": "Search granted US patents via PPUBS full-text search using USPTO query syntax.",
+            "tags": ["search", "patents"]
+        },
+        {
+            "id": "ppubs_search_applications",
+            "name": "ppubs_search_applications",
+            "description": "Search published US patent applications via PPUBS.",
+            "tags": ["search", "applications"]
+        },
+        {
+            "id": "ppubs_get_patent_by_number",
+            "name": "ppubs_get_patent_by_number",
+            "description": "Get a granted patent's full text by patent number.",
+            "tags": ["lookup", "patents"]
+        },
+        {
+            "id": "ppubs_get_full_document",
+            "name": "ppubs_get_full_document",
+            "description": "Get complete patent document by GUID.",
+            "tags": ["lookup", "documents"]
+        },
+        {
+            "id": "ppubs_download_patent_pdf",
+            "name": "ppubs_download_patent_pdf",
+            "description": "Download a patent as PDF (base64 encoded).",
+            "tags": ["download", "pdf"]
+        },
+        {
+            "id": "get_cpc_info",
+            "name": "get_cpc_info",
+            "description": "Look up CPC classification code information.",
+            "tags": ["lookup", "classification"]
+        },
+        {
+            "id": "get_status_code",
+            "name": "get_status_code",
+            "description": "Look up USPTO application status code meaning.",
+            "tags": ["lookup", "status"]
+        },
+        {
+            "id": "check_api_status",
+            "name": "check_api_status",
+            "description": "Check status and availability of the Patent Public Search API.",
+            "tags": ["diagnostic"]
+        }
+    ],
+    "url": "http://127.0.0.1:9000/",
+    "version": "0.1.0"
+}

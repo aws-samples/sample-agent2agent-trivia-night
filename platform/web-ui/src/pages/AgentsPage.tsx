@@ -295,11 +295,12 @@ const AgentsPage: React.FC = () => {
   };
 
   const handleCopyJson = async (agent: Agent) => {
+    const url = agent.agent_card?.url ?? '';
     try {
-      await navigator.clipboard.writeText(JSON.stringify(agent.agent_card, null, 2));
+      await navigator.clipboard.writeText(url);
     } catch {
       const ta = document.createElement('textarea');
-      ta.value = JSON.stringify(agent.agent_card, null, 2);
+      ta.value = url;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand('copy');

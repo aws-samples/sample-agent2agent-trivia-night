@@ -1,0 +1,6 @@
+httpx[http2]
+python-dotenv
+tenacity
+pydantic
+strands-agents[a2a]
+bedrock_agentcore
