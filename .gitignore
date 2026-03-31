@@ -32,6 +32,5 @@ platform/infrastructure/cdk.out/
 platform/web-ui/node_modules/
 platform/web-ui/build/
 platform/workshop-credentials.txt
-content/
 hidden
 temp/
