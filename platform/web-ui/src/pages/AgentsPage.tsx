@@ -462,6 +462,21 @@ const AgentsPage: React.FC = () => {
     </SpaceBetween>
   );
 
+  /* ---- Sync Orchestrator ---- */
+  const [syncing, setSyncing] = useState(false);
+  const handleSyncOrchestrator = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const res = await api.syncOrchestrator();
+      alert(res.message);
+      refresh();
+    } catch (err: any) {
+      alert(`Sync failed: ${err.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  }, [api, refresh]);
+
   const headerSection = (
     <Header
       counter={`(${filteredTotal})`}
@@ -475,6 +490,7 @@ const AgentsPage: React.FC = () => {
               { id: 'grid', iconName: 'view-full' },
             ]}
           />
+          <Button onClick={handleSyncOrchestrator} loading={syncing}>Sync Orchestrator</Button>
           <Button onClick={refresh} iconName="refresh">Refresh</Button>
           <Button variant="primary" onClick={() => navigate('/register')}>Register Agent</Button>
         </SpaceBetween>

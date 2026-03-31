@@ -27,6 +27,12 @@ export function getApiClient(): AgentRegistryClient {
   return client;
 }
 
+/** Returns the Lambda Function URL for chat, or empty string if not configured. */
+export function getChatFunctionUrl(): string {
+  const cfg = (window as any).AWS_CONFIG ?? {};
+  return cfg.chatFunctionUrl || '';
+}
+
 /**
  * Wait for credentials to be ready before making API calls.
  * Call this in components before the first API request.

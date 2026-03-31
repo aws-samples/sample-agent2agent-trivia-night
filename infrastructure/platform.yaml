@@ -111,6 +111,11 @@ Resources:
                   - bedrock-agentcore:InvokeAgentRuntime
                 Resource:
                   - !Sub "arn:${AWS::Partition}:bedrock-agentcore:*:${AWS::AccountId}:runtime/*"
+              - Effect: Allow
+                Action:
+                  - bedrock-agentcore:ListAgentRuntimes
+                  - bedrock-agentcore:GetAgentRuntime
+                Resource: "*"
         - PolicyName: STSAccess
           PolicyDocument:
             Version: "2012-10-17"
@@ -118,6 +123,23 @@ Resources:
               - Effect: Allow
                 Action:
                   - sts:GetCallerIdentity
+                Resource: "*"
+        - PolicyName: SSMReadAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${StackPrefix}/platform/*"
+        - PolicyName: CognitoAuthAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:InitiateAuth
                 Resource: "*"
 
   # 1.5 - Lambda CloudWatch Log Group
@@ -176,6 +198,33 @@ Resources:
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: lambda.zip
+
+  # 1.7 - Lambda Function URL (bypasses API Gateway 29s timeout for chat)
+  ApiLambdaFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      AuthType: AWS_IAM
+      TargetFunctionArn: !GetAtt ApiLambdaFunction.Arn
+      Cors:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - POST
+        AllowHeaders:
+          - Content-Type
+          - X-Amz-Date
+          - Authorization
+          - X-Amz-Security-Token
+          - X-Amz-Content-Sha256
+
+  # 1.8 - Function URL invoke permission
+  FunctionUrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt ApiLambdaFunction.Arn
+      Action: lambda:InvokeFunctionUrl
+      Principal: !Ref "AWS::AccountId"
+      FunctionUrlAuthType: AWS_IAM
 
   # ===========================================================================
   # Task 2: API Gateway Resources
@@ -667,6 +716,12 @@ Resources:
                   - execute-api:Invoke
                 Resource:
                   - !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*"
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunctionUrl
+                  - lambda:InvokeFunction
+                Resource:
+                  - !GetAtt ApiLambdaFunction.Arn
 
   # 4.5 - Identity Pool Role Attachment
   IdentityPoolRoleAttachment:
@@ -1110,6 +1165,7 @@ Resources:
             userPoolWebClientId: "{resource_props.get('UserPoolClientId')}",
             identityPoolId: "{resource_props.get('IdentityPoolId')}",
             apiGatewayUrl: "{resource_props.get('ApiGatewayUrl')}",
+            chatFunctionUrl: "{resource_props.get('ChatFunctionUrl', '')}",
             cognitoDomain: "{resource_props.get('CognitoDomain')}"
           }};
           """
@@ -1158,6 +1214,7 @@ Resources:
       UserPoolClientId: !Ref CognitoUserPoolClient
       IdentityPoolId: !Ref CognitoIdentityPool
       ApiGatewayUrl: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.${AWS::URLSuffix}/prod/"
+      ChatFunctionUrl: !GetAtt ApiLambdaFunctionUrl.FunctionUrl
       CognitoDomain: !Sub
         - "${DomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
         - DomainPrefix: !Sub
@@ -1468,6 +1525,10 @@ Outputs:
   PlatformURL:
     Description: LSS Workshop Platform URL
     Value: !Sub "https://${WebUIDistribution.DomainName}"
+
+  ChatFunctionUrl:
+    Description: Lambda Function URL for chat (bypasses API Gateway 29s timeout)
+    Value: !GetAtt ApiLambdaFunctionUrl.FunctionUrl
 
   CognitoUserPoolConsoleUrl:
     Description: Cognito User Pool console URL

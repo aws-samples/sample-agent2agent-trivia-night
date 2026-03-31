@@ -23,6 +23,7 @@ export class ApiStack extends cdk.Stack {
   public readonly vectorIndex: s3vectors.VectorIndex;
   public readonly apiLambda: lambda.Function;
   public readonly api: apigateway.RestApi;
+  public readonly chatFunctionUrl: lambda.FunctionUrl;
   public readonly stackPrefix: cdk.CfnParameter;
 
   constructor(scope: Construct, id: string, props?: ApiStackProps) {
@@ -137,6 +138,11 @@ export class ApiStack extends cdk.Stack {
               resources: [
                 `arn:aws:ssm:${this.region}:${this.account}:parameter/Workshop/platform/*`,
               ],
+            }),
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: ["cognito-idp:InitiateAuth"],
+              resources: ["*"],
             }),
           ],
         }),
@@ -272,6 +278,30 @@ export class ApiStack extends cdk.Stack {
       sourceArn: this.api.arnForExecuteApi("*"),
     });
 
+    // Lambda Function URL for /chat — bypasses API Gateway 29s timeout
+    this.chatFunctionUrl = this.apiLambda.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.AWS_IAM,
+      cors: {
+        allowedOrigins: corsOrigin === "*" ? ["*"] : [corsOrigin],
+        allowedMethods: [lambda.HttpMethod.POST],
+        allowedHeaders: [
+          "Content-Type",
+          "X-Amz-Date",
+          "Authorization",
+          "X-Amz-Security-Token",
+          "X-Amz-Content-Sha256",
+        ],
+      },
+    });
+
+    // Allow any authenticated IAM principal to invoke the Function URL.
+    // Access is further scoped by the Cognito Identity Pool role's identity policy.
+    this.apiLambda.addPermission("FunctionUrlInvoke", {
+      principal: new iam.AccountPrincipal(this.account),
+      action: "lambda:InvokeFunctionUrl",
+      functionUrlAuthType: lambda.FunctionUrlAuthType.AWS_IAM,
+    });
+
     // Add CORS headers to error responses
     const corsAllowOrigin = corsOrigin === "*" ? "'*'" : `'${corsOrigin}'`;
 
@@ -323,6 +353,12 @@ export class ApiStack extends cdk.Stack {
       value: this.api.restApiId,
       description: "LSS Workshop Platform API Gateway ID",
       exportName: `${this.stackName}-ApiId`,
+    });
+
+    new cdk.CfnOutput(this, "ChatFunctionUrl", {
+      value: this.chatFunctionUrl.url,
+      description: "Lambda Function URL for chat (bypasses API Gateway 29s timeout)",
+      exportName: `${this.stackName}-ChatFunctionUrl`,
     });
 
     // ---------------------------------------------------------------
@@ -405,6 +441,19 @@ export class ApiStack extends cdk.Stack {
           id: "AwsSolutions-L1",
           reason:
             "Python 3.13 is the latest stable runtime supported by AWS Lambda at time of deployment.",
+        },
+      ],
+      true
+    );
+
+    // Suppress Function URL auth warning — using AWS_IAM auth type
+    NagSuppressions.addResourceSuppressions(
+      this.chatFunctionUrl,
+      [
+        {
+          id: "AwsSolutions-L6",
+          reason:
+            "Function URL uses AWS_IAM authentication. Access is restricted to authenticated Cognito Identity Pool users with lambda:InvokeFunctionUrl permission.",
         },
       ],
       true

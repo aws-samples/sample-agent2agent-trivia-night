@@ -43,6 +43,7 @@ export class AgentRegistryClient {
   private region: string;
   private maxRetries: number;
   private signer?: SignatureV4;
+  private lambdaSigner?: SignatureV4;
 
   constructor(config: AgentRegistryClientConfig) {
     this.apiGatewayUrl = config.apiGatewayUrl.replace(/\/$/, '');
@@ -66,10 +67,17 @@ export class AgentRegistryClient {
 
   /** Refresh the SigV4 signer with new credentials (e.g. after login) */
   async updateCredentials(credentials: any): Promise<void> {
+    const credentialProvider = () => Promise.resolve(credentials);
     this.signer = new SignatureV4({
-      credentials: () => Promise.resolve(credentials),
+      credentials: credentialProvider,
       region: this.region,
       service: 'execute-api',
+      sha256: Sha256,
+    });
+    this.lambdaSigner = new SignatureV4({
+      credentials: credentialProvider,
+      region: this.region,
+      service: 'lambda',
       sha256: Sha256,
     });
   }
@@ -265,5 +273,65 @@ export class AgentRegistryClient {
 
   async chat(agentId: string, message: string): Promise<ChatResponse> {
     return this.makeRequest<ChatResponse>('POST', '/chat', { agentId, message });
+  }
+
+  /* ---------------------------------------------------------------- */
+  /*  Sync Orchestrator                                                */
+  /* ---------------------------------------------------------------- */
+
+  async syncOrchestrator(): Promise<{ message: string; agent_id?: string; arn?: string }> {
+    return this.makeRequest('POST', '/agents/sync-orchestrator');
+  }
+
+  /**
+   * Chat via Lambda Function URL — bypasses API Gateway 29s timeout.
+   * Signs with service 'lambda' instead of 'execute-api'.
+   */
+  async chatViaFunctionUrl(
+    functionUrl: string,
+    agentId: string,
+    message: string,
+  ): Promise<ChatResponse> {
+    if (!this.lambdaSigner) {
+      throw new AgentRegistryError('No credentials configured for Function URL signing');
+    }
+
+    const url = new URL(functionUrl);
+    const body = JSON.stringify({ agentId, message });
+
+    const httpReq = new HttpRequest({
+      method: 'POST',
+      protocol: url.protocol,
+      hostname: url.hostname,
+      path: url.pathname,
+      headers: {
+        'Content-Type': 'application/json',
+        host: url.hostname,
+      },
+      body,
+    });
+
+    const signed = await this.lambdaSigner.sign(httpReq);
+
+    // Remove 'host' header — browsers set it automatically and reject manual overrides.
+    // SigV4 still validates it because the browser-set Host matches the signed value.
+    const { host, ...fetchHeaders } = signed.headers;
+
+    const response = await fetch(url.toString(), {
+      method: signed.method,
+      headers: fetchHeaders,
+      body: signed.body,
+    });
+
+    if (!response.ok) {
+      let errorMessage = `Chat request failed with status ${response.status}`;
+      try {
+        const errData = await response.json();
+        errorMessage = errData.message || errorMessage;
+      } catch { /* use default */ }
+      throw new AgentRegistryError(errorMessage, response.status);
+    }
+
+    return (await response.json()) as ChatResponse;
   }
 }

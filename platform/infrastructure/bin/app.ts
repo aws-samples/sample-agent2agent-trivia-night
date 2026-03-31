@@ -31,6 +31,8 @@ const webUiStack = new WebUiStack(app, webUiStackName, {
   env,
   apiGatewayUrl: apiStack.api.url,
   apiGatewayId: apiStack.api.restApiId,
+  chatFunctionUrl: apiStack.chatFunctionUrl.url,
+  chatFunctionArn: apiStack.apiLambda.functionArn,
   stackPrefix: apiStack.stackPrefix,
 });
 

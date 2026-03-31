@@ -3,6 +3,7 @@ import {
   AppLayout,
   BreadcrumbGroup,
   BreadcrumbGroupProps,
+  Button,
   Flashbar,
   FlashbarProps,
   Toggle,
@@ -10,6 +11,7 @@ import {
 } from '@cloudscape-design/components';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Navigation from './Navigation';
+import AuthService from '../services/AuthService';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -54,6 +56,11 @@ const Layout: React.FC<LayoutProps> = ({ children, notifications = [], darkMode 
               </Toggle>
             </div>
           )}
+          <div style={{ padding: '0 20px' }}>
+            <Button variant="link" onClick={() => AuthService.getInstance().signOut()}>
+              Sign out
+            </Button>
+          </div>
         </SpaceBetween>
       }
       navigationOpen={navOpen}

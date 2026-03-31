@@ -9,7 +9,7 @@ import {
 } from '@cloudscape-design/components';
 import { useSearchParams } from 'react-router-dom';
 import type { AgentCard } from '../types/AgentCard';
-import { getApiClient, ensureCredentials } from '../services/apiClient';
+import { getApiClient, ensureCredentials, getChatFunctionUrl } from '../services/apiClient';
 import AgentSelector from '../components/AgentSelector';
 import AgentInfoHeader from '../components/AgentInfoHeader';
 import ChatPanel, { type ChatMessage } from '../components/ChatPanel';
@@ -127,7 +127,12 @@ const ChatPage: React.FC = () => {
       // Call chat endpoint
       setChatLoading(true);
       try {
-        const res = await api.chat(selectedAgent.agent_id, text);
+        const functionUrl = getChatFunctionUrl();
+        const res = await api.chatViaFunctionUrl(functionUrl, selectedAgent.agent_id, text);
+        // Fallback to API Gateway chat route (commented out — using Function URL only)
+        // const res = functionUrl
+        //   ? await api.chatViaFunctionUrl(functionUrl, selectedAgent.agent_id, text)
+        //   : await api.chat(selectedAgent.agent_id, text);
         const agentMsg: ChatMessage = {
           id: nextId(),
           role: 'agent',

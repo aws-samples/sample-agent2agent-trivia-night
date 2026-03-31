@@ -39,21 +39,22 @@ class AgentUnreachableError(ChatServiceError):
 class ChatService:
     """Invokes registered agents via HTTP with Cognito bearer token."""
 
-    INVOCATION_TIMEOUT = 28
+    INVOCATION_TIMEOUT = 55
 
     def __init__(self, agent_service: Optional[AgentService] = None) -> None:
         self.agent_service = agent_service or AgentService()
         self._default_region = os.environ.get("AWS_REGION", "us-east-1")
         self._ssm_prefix = os.environ.get("SSM_PREFIX", "/Workshop/platform")
-        self._bearer_token = None
+        self._m2m_token = None
+        self._user_token = None
         self._ssm = boto3.client("ssm", region_name=self._default_region)
         self._cognito = boto3.client("cognito-idp", region_name=self._default_region)
         logger.info("Initialised ChatService")
 
-    def _get_bearer_token(self) -> str:
-        """Get a Cognito M2M bearer token using client_credentials flow."""
-        if self._bearer_token:
-            return self._bearer_token
+    def _get_m2m_token(self) -> str:
+        """Get a Cognito M2M bearer token using client_credentials flow (for A2A agents)."""
+        if self._m2m_token:
+            return self._m2m_token
 
         client_id = self._ssm.get_parameter(Name=f"{self._ssm_prefix}/m2m_client_id")["Parameter"]["Value"]
         client_secret = self._ssm.get_parameter(Name=f"{self._ssm_prefix}/m2m_client_secret", WithDecryption=True)["Parameter"]["Value"]
@@ -72,9 +73,27 @@ class ChatService:
             method="POST",
         )
         with urlopen(req, timeout=10) as resp:  # nosec B310
-            self._bearer_token = json.loads(resp.read().decode())["access_token"]
+            self._m2m_token = json.loads(resp.read().decode())["access_token"]
 
-        return self._bearer_token
+        return self._m2m_token
+
+    def _get_user_token(self) -> str:
+        """Get a Cognito user access token using USER_PASSWORD_AUTH (for HTTP agents)."""
+        if self._user_token:
+            return self._user_token
+
+        client_id = self._ssm.get_parameter(Name=f"{self._ssm_prefix}/cognito_client_id")["Parameter"]["Value"]
+        username = self._ssm.get_parameter(Name=f"{self._ssm_prefix}/username")["Parameter"]["Value"]
+        password = self._ssm.get_parameter(Name=f"{self._ssm_prefix}/password", WithDecryption=True)["Parameter"]["Value"]
+
+        resp = self._cognito.initiate_auth(
+            ClientId=client_id,
+            AuthFlow="USER_PASSWORD_AUTH",
+            AuthParameters={"USERNAME": username, "PASSWORD": password},
+        )
+        self._user_token = resp["AuthenticationResult"]["AccessToken"]
+
+        return self._user_token
 
     def _extract_arn_from_url(self, url: str) -> Optional[str]:
         """Extract the AgentCore Runtime ARN from a registered URL.
@@ -119,23 +138,30 @@ class ChatService:
 
         logger.info(f"Agent URL: {agent_url}")
 
+        # Determine protocol: A2A agents use 'text', HTTP agents use 'text/plain'
+        input_modes = agent.get("defaultInputModes", [])
+        is_a2a = "text" in input_modes and "text/plain" not in input_modes
+
         try:
-            bearer_token = self._get_bearer_token()
+            bearer_token = self._get_m2m_token() if is_a2a else self._get_user_token()
             session_id = str(uuid.uuid4())
 
-            payload = json.dumps({
-                "jsonrpc": "2.0",
-                "method": "message/send",
-                "id": session_id,
-                "params": {
-                    "message": {
-                        "role": "user",
-                        "parts": [{"kind": "text", "text": message}],
-                        "messageId": str(uuid.uuid4()),
+            if is_a2a:
+                payload = json.dumps({
+                    "jsonrpc": "2.0",
+                    "method": "message/send",
+                    "id": session_id,
+                    "params": {
+                        "message": {
+                            "role": "user",
+                            "parts": [{"kind": "text", "text": message}],
+                            "messageId": str(uuid.uuid4()),
+                        },
+                        "configuration": {"acceptedOutputModes": ["text"]},
                     },
-                    "configuration": {"acceptedOutputModes": ["text"]},
-                },
-            })
+                })
+            else:
+                payload = json.dumps({"prompt": message})
 
             req = Request(
                 agent_url,
@@ -151,23 +177,35 @@ class ChatService:
             with urlopen(req, timeout=self.INVOCATION_TIMEOUT) as resp:  # nosec B310
                 response_text = resp.read().decode("utf-8")
 
-            # Parse JSONRPC response
-            try:
-                parsed = json.loads(response_text)
-                if "result" in parsed:
-                    result = parsed["result"]
-                    # Extract text from A2A message parts
-                    parts = []
-                    for artifact in result.get("artifacts", []):
-                        for part in artifact.get("parts", []):
-                            if part.get("kind") == "text":
-                                parts.append(part["text"])
-                    if parts:
-                        response_text = "\n".join(parts)
-                    elif isinstance(result, str):
-                        response_text = result
-            except (json.JSONDecodeError, ValueError):
-                pass
+            if is_a2a:
+                # Parse JSONRPC response
+                try:
+                    parsed = json.loads(response_text)
+                    if "result" in parsed:
+                        result = parsed["result"]
+                        # Extract text from A2A message parts
+                        parts = []
+                        for artifact in result.get("artifacts", []):
+                            for part in artifact.get("parts", []):
+                                if part.get("kind") == "text":
+                                    parts.append(part["text"])
+                        if parts:
+                            response_text = "\n".join(parts)
+                        elif isinstance(result, str):
+                            response_text = result
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            else:
+                # Parse HTTP agent response — may be plain text, JSON, or SSE
+                try:
+                    parsed = json.loads(response_text)
+                    # Handle {"response": "..."} or {"output": "..."} or {"result": "..."}
+                    for key in ("response", "output", "result", "text"):
+                        if key in parsed and isinstance(parsed[key], str):
+                            response_text = parsed[key]
+                            break
+                except (json.JSONDecodeError, ValueError):
+                    pass
 
             # Parse SSE data frames if present
             if response_text.strip().startswith("data:"):
@@ -191,8 +229,9 @@ class ChatService:
 
         except Exception as e:
             logger.error(f"Error invoking agent agent_id={agent_id}: {e}")
-            # Clear cached token in case it expired
-            self._bearer_token = None
+            # Clear cached tokens in case they expired
+            self._m2m_token = None
+            self._user_token = None
             raise AgentUnreachableError(
                 f"Failed to invoke agent: {e}",
                 {"agent_id": agent_id, "agent_url": agent_url},

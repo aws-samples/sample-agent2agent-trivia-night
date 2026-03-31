@@ -7,6 +7,7 @@ import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 import { NagSuppressions } from "cdk-nag";
 
 export interface WebUiStackProps extends cdk.StackProps {
@@ -14,6 +15,10 @@ export interface WebUiStackProps extends cdk.StackProps {
   apiGatewayUrl: string;
   /** API Gateway REST API ID from ApiStack */
   apiGatewayId: string;
+  /** Lambda Function URL for chat (bypasses API Gateway 29s timeout) */
+  chatFunctionUrl: string;
+  /** Lambda Function ARN for chat Function URL IAM permission */
+  chatFunctionArn: string;
   /** StackPrefix CfnParameter for cross-stack naming with existing workshop templates */
   stackPrefix: cdk.CfnParameter;
 }
@@ -151,7 +156,7 @@ export class WebUiStack extends cdk.Stack {
       generateSecret: false, // Public client for SPA
       authFlows: {
         userSrp: true,
-        userPassword: false,
+        userPassword: true,
         adminUserPassword: false,
         custom: false,
       },
@@ -237,6 +242,11 @@ export class WebUiStack extends cdk.Stack {
               resources: [
                 `arn:aws:execute-api:${this.region}:${this.account}:${props.apiGatewayId}/*/*`,
               ],
+            }),
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
+              resources: [props.chatFunctionArn],
             }),
           ],
         }),
@@ -328,6 +338,7 @@ def handler(event, context):
   userPoolWebClientId: "{resource_props.get('UserPoolClientId')}",
   identityPoolId: "{resource_props.get('IdentityPoolId')}",
   apiGatewayUrl: "{resource_props.get('ApiGatewayUrl')}",
+  chatFunctionUrl: "{resource_props.get('ChatFunctionUrl')}",
   cognitoDomain: "{resource_props.get('CognitoDomain')}"
 }};
 """
@@ -394,6 +405,7 @@ def handler(event, context):
           UserPoolClientId: this.userPoolClient.userPoolClientId,
           IdentityPoolId: this.identityPool.ref,
           ApiGatewayUrl: props.apiGatewayUrl,
+          ChatFunctionUrl: props.chatFunctionUrl,
           CognitoDomain: `${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`,
           Version: "1.0",
           DeploymentTimestamp: Date.now().toString(),
@@ -403,6 +415,13 @@ def handler(event, context):
 
     // Ensure config is generated after the main web UI deployment
     configGeneratorResource.node.addDependency(webUIDeployment);
+
+    // SSM Parameter: web client ID for Lambda to get user access tokens
+    new ssm.StringParameter(this, "CognitoClientIdParameter", {
+      parameterName: "/Workshop/platform/cognito_client_id",
+      stringValue: this.userPoolClient.userPoolClientId,
+      description: "Cognito web client ID (USER_PASSWORD_AUTH enabled)",
+    });
 
     // -------------------------------------------------------------------------
     // CloudFormation Outputs
