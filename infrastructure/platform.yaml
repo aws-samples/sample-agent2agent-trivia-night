@@ -1512,8 +1512,136 @@ Resources:
         - "lss-platform-${UniqueId}"
         - UniqueId: !Select [0, !Split ["-", !Select [2, !Split ["/", !Ref "AWS::StackId"]]]]
 
+  # ===========================================================================
+  # Task 7: Bucket Emptier Custom Resources (enables clean stack deletion)
+  # ===========================================================================
+
+  # 7.1 - Bucket Emptier Lambda Role
+  BucketEmptierRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub lambda.${AWS::URLSuffix}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: S3EmptyBuckets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:ListBucketVersions
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::lss-platform-webui-${AWS::AccountId}-${AWS::Region}"
+                  - !Sub "arn:${AWS::Partition}:s3:::lss-platform-lambda-${AWS::AccountId}-${AWS::Region}"
+                  - !Sub "arn:${AWS::Partition}:s3:::lss-platform-cf-logs-${AWS::AccountId}-${AWS::Region}"
+              - Effect: Allow
+                Action:
+                  - s3:DeleteObject
+                  - s3:DeleteObjectVersion
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::lss-platform-webui-${AWS::AccountId}-${AWS::Region}/*"
+                  - !Sub "arn:${AWS::Partition}:s3:::lss-platform-lambda-${AWS::AccountId}-${AWS::Region}/*"
+                  - !Sub "arn:${AWS::Partition}:s3:::lss-platform-cf-logs-${AWS::AccountId}-${AWS::Region}/*"
+
+  # 7.2 - Bucket Emptier Lambda
+  BucketEmptierLambda:
+    Type: AWS::Lambda::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: CloudFormation custom function does not need reserved concurrency
+          - id: CKV_AWS_116
+            comment: DLQ not required for this CloudFormation custom resource Lambda
+          - id: CKV_AWS_117
+            comment: CloudFormation custom function does not need VPC
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: AWSLambdaBasicExecutionRole includes CloudWatch Logs permissions
+          - id: W89
+            reason: CloudFormation custom function does not need VPC
+          - id: W92
+            reason: CloudFormation custom function does not need reserved concurrency
+    Properties:
+      Description: Empties an S3 bucket (including all object versions) before stack deletion
+      Handler: index.handler
+      Runtime: python3.13
+      MemorySize: 128
+      Timeout: 300
+      Architectures:
+        - arm64
+      Role: !GetAtt BucketEmptierRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def empty_bucket(s3, bucket):
+              """Delete all objects and versions from a bucket."""
+              paginator = s3.get_paginator('list_object_versions')
+              for page in paginator.paginate(Bucket=bucket):
+                  objects = []
+                  for v in page.get('Versions', []):
+                      objects.append({'Key': v['Key'], 'VersionId': v['VersionId']})
+                  for m in page.get('DeleteMarkers', []):
+                      objects.append({'Key': m['Key'], 'VersionId': m['VersionId']})
+                  if objects:
+                      s3.delete_objects(Bucket=bucket, Delete={'Objects': objects, 'Quiet': True})
+                      logger.info(f'Deleted {len(objects)} objects/versions from {bucket}')
+
+          def handler(event, context):
+              logger.info(f'Event: {event}')
+              bucket = event['ResourceProperties']['BucketName']
+              try:
+                  if event['RequestType'] == 'Delete':
+                      s3 = boto3.client('s3')
+                      logger.info(f'Emptying bucket: {bucket}')
+                      empty_bucket(s3, bucket)
+                      logger.info(f'Bucket {bucket} emptied successfully')
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+              except Exception as e:
+                  logger.error(f'Error emptying bucket {bucket}: {e}')
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {}, reason=str(e))
+
+  # 7.3 - Empty WebUI bucket before deletion
+  WebUIBucketEmptier:
+    Type: Custom::BucketEmptier
+    DependsOn: WebUIBucketSSLPolicy
+    Properties:
+      ServiceToken: !GetAtt BucketEmptierLambda.Arn
+      BucketName: !Ref WebUIBucket
+
+  # 7.4 - Empty Lambda code bucket before deletion
+  LambdaCodeBucketEmptier:
+    Type: Custom::BucketEmptier
+    DependsOn: LambdaCodeBucket
+    Properties:
+      ServiceToken: !GetAtt BucketEmptierLambda.Arn
+      BucketName: !Ref LambdaCodeBucket
+
+  # 7.5 - Empty CloudFront logs bucket before deletion
+  CloudFrontLogsBucketEmptier:
+    Type: Custom::BucketEmptier
+    DependsOn: CloudFrontLogsBucketPolicy
+    Properties:
+      ServiceToken: !GetAtt BucketEmptierLambda.Arn
+      BucketName: !Ref CloudFrontLogsBucket
+
 # ===========================================================================
-# Task 7: CloudFormation Outputs
+# Task 8: CloudFormation Outputs
 # ===========================================================================
 Outputs:
   ApiGatewayUrl:
