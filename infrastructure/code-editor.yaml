@@ -1292,6 +1292,7 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: True
+        PriceClass: PriceClass_100
         HttpVersion: http2and3
         CacheBehaviors:
           - AllowedMethods:
