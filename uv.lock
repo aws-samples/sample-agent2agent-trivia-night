@@ -48,7 +48,7 @@ requires-dist = [
     { name = "chardet", specifier = "<6.0.0" },
     { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "mcp", specifier = ">=1.26.0" },
+    { name = "mcp", specifier = ">=1.10.0" },
     { name = "paper-qa", specifier = ">=2026.3.3" },
     { name = "strands-agents", extras = ["a2a"], specifier = ">=1.28.0" },
     { name = "strands-agents-tools", specifier = ">=0.2.22" },
