@@ -2,15 +2,24 @@ import logging
 import os
 from strands_tools.calculator import calculator
 from strands import Agent
+from strands.models import BedrockModel
 from strands.multiagent.a2a import A2AServer
 import uvicorn
 from fastapi import FastAPI
 
 logging.basicConfig(level=logging.INFO)
 
+MODEL_ID = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+model = BedrockModel(
+    model_id=MODEL_ID,
+    max_tokens=10000,
+    temperature=1,
+)
+
 strands_agent = Agent(
     name="Calculator Agent",
     description="A calculator agent that can perform basic arithmetic operations.",
+    model=model,
     tools=[calculator],
     callback_handler=None,
 )

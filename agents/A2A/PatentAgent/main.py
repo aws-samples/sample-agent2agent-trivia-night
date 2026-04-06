@@ -9,7 +9,7 @@ import uvicorn
 
 from tools import ALL_TOOLS
 
-MODEL_ID = os.environ.get("MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
+MODEL_ID = os.environ.get("MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0")
 
 SYSTEM_PROMPT = """You are a USPTO patent research assistant. You have access to Patent Public Search
 (ppubs.uspto.gov) tools for searching patents, applications, and downloading documents.
@@ -28,7 +28,10 @@ strands_agent = Agent(
 # A2A server
 runtime_url = os.environ.get("AGENTCORE_RUNTIME_URL", "http://127.0.0.1:9000/")
 logging.info(f"Runtime URL: {runtime_url}")
-host, port = "0.0.0.0", 9000  # nosec B104 — binds all interfaces; runs inside container behind AgentCore Runtime proxy
+host, port = (
+    "0.0.0.0",
+    9000,
+)  # nosec B104 — binds all interfaces; runs inside container behind AgentCore Runtime proxy
 
 a2a_server = A2AServer(
     agent=strands_agent,

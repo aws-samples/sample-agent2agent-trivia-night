@@ -11,7 +11,7 @@ from fastapi import FastAPI
 logging.basicConfig(level=logging.INFO)
 
 MCP_ENDPOINT = "https://subwayinfo.nyc/mcp"
-MODEL_ID = "global.anthropic.claude-sonnet-4-6"
+MODEL_ID = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 SYSTEM_PROMPT = """
 You are a helpful AI assistant with knowledge of New York City transit data.
