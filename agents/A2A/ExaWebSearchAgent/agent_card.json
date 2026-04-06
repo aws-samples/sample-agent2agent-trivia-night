@@ -1,0 +1,31 @@
+{
+    "capabilities": {
+        "streaming": true
+    },
+    "defaultInputModes": [
+        "text"
+    ],
+    "defaultOutputModes": [
+        "text"
+    ],
+    "description": "An AI assistant with access to web search.",
+    "name": "NYC Transit Agent",
+    "preferredTransport": "JSONRPC",
+    "protocolVersion": "0.3.0",
+    "skills": [
+        {
+            "description": "Search the web for any topic and get clean, ready-to-use content.\n\nBest for: Finding current information, news, facts, or answering questions about any topic.\nReturns: Clean text content from top search results, ready for LLM use.\n\nQuery tips: describe the ideal page, not keywords. \"blog post comparing React and Vue performance\" not \"React vs Vue\".\nIf highlights are insufficient, follow up with web_fetch_exa on the best URLs.",
+            "id": "web_search_exa",
+            "name": "web_search_exa",
+            "tags": []
+        },
+        {
+            "description": "Read a webpage's full content as clean markdown. Use after web_search_exa when highlights are insufficient or to read any URL.\n\nBest for: Extracting full content from known URLs. Batch multiple URLs in one call.\nReturns: Clean text content and metadata from the page(s).",
+            "id": "web_fetch_exa",
+            "name": "web_fetch_exa",
+            "tags": []
+        }
+    ],
+    "url": "http://127.0.0.1:9000/",
+    "version": "0.0.1"
+}
