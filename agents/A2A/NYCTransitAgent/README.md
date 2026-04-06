@@ -35,6 +35,7 @@ uv run agentcore configure \
 -n NYCTransitExpert \
 -rt PYTHON_3_13 \
 -rf requirements.txt \
+-p A2A \
 -do -dm -r $AWS_REGION \
 --authorizer-config "{\"customJWTAuthorizer\": {\"discoveryUrl\": \"$COGNITO_DISCOVERY_URL\", \"allowedClients\": [\"$COGNITO_M2M_CLIENT_ID\"]}}"
 ```
