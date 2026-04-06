@@ -1,13 +1,13 @@
 import logging
 import httpx
 from defusedxml import ElementTree as ET
-from defusedxml.ElementTree import Element
+from xml.etree.ElementTree import Element
 from strands import tool
 
 logger = logging.getLogger("get_paper")
 logger.setLevel(logging.INFO)
 
-SEARCH_URL = "http://export.arxiv.org/api/query"
+SEARCH_URL = "https://export.arxiv.org/api/query"
 
 NS = {
     "atom": "http://www.w3.org/2005/Atom",
