@@ -28,7 +28,7 @@ with mcp_client as client:
     tools = client.list_tools_sync()
 
 strands_agent = Agent(
-    name="NYC Transit Agent",
+    name="Exa Web Search Agent",
     model=BedrockModel(model_id=MODEL_ID),
     description="An AI assistant with access to web search.",
     system_prompt=SYSTEM_PROMPT,

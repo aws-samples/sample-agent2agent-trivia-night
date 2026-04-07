@@ -9,7 +9,7 @@
         "text"
     ],
     "description": "An AI assistant with access to web search.",
-    "name": "NYC Transit Agent",
+    "name": "Exa Web Search Agent",
     "preferredTransport": "JSONRPC",
     "protocolVersion": "0.3.0",
     "skills": [
