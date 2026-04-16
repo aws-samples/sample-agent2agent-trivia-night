@@ -8,57 +8,32 @@ Code examples for the Agent2Agent Trivia Night workshop
 
 ### Overview
 
-If you are attending an AWS hosted event, you will have access to an AWS account with any optional pre-provisioned infrastructure and IAM policies needed to complete this workshop. The goal of this section is to help you access this AWS account.
+You need to use your own AWS Account to perform the next steps. This may incur some charges. Please note the clean-up step below to minimize these charges.
 
-### Launch Visual Studio Code - Open Source
+If you are completing this workshop at an AWS Instructor-led event, you do NOT need to complete these steps.
 
-After joining the event, you should see the page with event information and workshop details. You should also see a section titled "Outputs". Choose the URL value to launch Visual Studio Code - Open Source (Code-OSS) in your participant AWS account.
+### Deploy workshop infrastructure
 
-### Download the Workshop Contents
+Follow these steps to deploy the supporting infrastructure for this workshop into your own AWS account. This will incur charges. Before beginning, verify that you have [valid AWS credentials](https://docs.aws.amazon.com/cli/v1/userguide/cli-chap-configure.html#configure-precedence) set in your environment.
 
-### Install dependencies
-
-#### Install uv
+1. Download the example code to your local computer by opening a terminal and running the following command.
 
 ```bash
-curl -LsSf <https://astral.sh/uv/install.sh> | sh
-uv --version
+git clone https://github.com/aws-samples/sample-agent2agent-trivia-night.git
+cd sample-agent2agent-trivia-night
 ```
 
-#### Install Amazon Bedrock AgentCore CLI
+2. Run `./scripts/deploy.sh` to deploy the necessary infrastructure for this workshop into your AWS account. The script will print the required **CodeEditorURL**, **PlatformURL**, **PlatformUsername**, and **PlatformPassword** values to your terminal for later use.
 
-```bash
-curl -o- <https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh> | bash
-\. "$HOME/.nvm/nvm.sh"
-nvm install 24
-node -v # Should print "v24.14.0" or greater.
-npm -v # Should print "11.9.0" or greater.
-npm install -g @aws/agentcore
-agentcore --version # Should print "0.3.0-preview.3.0" or greater
-```
+3. Follow the remaining insructions on the [AWS Instructor-Led Workshop](/getting-started/aws-instructor-led-workshop) page, to continue with workshop setup
 
-#### Install Kiro CLI
+### Clean up
 
-```bash
-curl --proto '=https' --tlsv1.2 -sSf '<https://desktop-release.q.us-east-1.amazonaws.com/latest/kirocli-aarch64-linux.zip>' -o 'kirocli.zip'
-unzip kirocli.zip
-./kirocli/install.sh
-kiro-cli login --use-device-flow
+When finished with the workshop, run `./scripts/destroy.sh` on your local computer to delete all workshop resources and stop charges.
 
-# Open the awsapps.con URL in your browser, confirm the login code, and approve Kiro CLI access
+### Workshop Costs
 
-kiro-cli --version
-rm kirocli.zip
-rm -rf kirocli/
-```
-
-**Congratulations!!** You have successfully downloaded the content of this workshop. You can move to Lab 1.
-
-### Best Practices
-
-- Do not upload any personal or confidential information in the account.
-- The AWS account will only be available for the duration of this workshop and you will not be able to retain access after the workshop is complete. Backup any materials you wish to keep access to after the workshop.
-- Any pre-provisioned infrastructure will be deployed to a specific region. Check your workshop content to determine whether other regions will be used.
+The estimated cost to complete these workshop in your own AWS account is approximately $3.00.
 
 ## Exercise 1: Deploy your first orchestreation agent
 
