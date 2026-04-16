@@ -93,6 +93,10 @@ deploy_stack "$STACK_PLATFORM" "$INFRA_DIR/platform.yaml"
 # 4. Agents — CodeBuild project that deploys the A2A agents to AgentCore
 deploy_stack "$STACK_AGENTS" "$INFRA_DIR/agents.yaml"
 
+# Clean up the staging S3 bucket
+echo "Cleaning up staging bucket: $CFN_BUCKET"
+aws s3 rb "s3://$CFN_BUCKET" --region "$REGION" --force
+
 echo "============================================"
 echo "  All stacks deployed successfully! 🎉"
 echo "============================================"
