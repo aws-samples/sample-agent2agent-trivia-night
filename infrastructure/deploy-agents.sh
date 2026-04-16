@@ -97,6 +97,21 @@ elif [ "$STACK_OPERATION" == "Delete" ]; then
         fi
     done
 
+    # Clean up lab-created agents that aren't part of the automated deployment
+    for LAB_AGENT_NAME in "OrchestratorAgent_Agent" "AWSKnowledgeAgent"; do
+        echo "Checking for lab agent: $LAB_AGENT_NAME"
+        AGENT_RUNTIME_ID=$(aws bedrock-agentcore-control list-agent-runtimes \
+          --query "agentRuntimes[?agentRuntimeName=='$LAB_AGENT_NAME'].agentRuntimeId" \
+          --output text)
+        if [ -n "$AGENT_RUNTIME_ID" ] && [ "$AGENT_RUNTIME_ID" != "None" ]; then
+            echo "Deleting agent runtime: $AGENT_RUNTIME_ID"
+            aws bedrock-agentcore-control delete-agent-runtime --agent-runtime-id "$AGENT_RUNTIME_ID"
+            echo "Deleted $LAB_AGENT_NAME ($AGENT_RUNTIME_ID)"
+        else
+            echo "No agent runtime found with name '$LAB_AGENT_NAME', skipping delete."
+        fi
+    done
+
 else
     echo "Invalid stack operation!"
     exit 1
