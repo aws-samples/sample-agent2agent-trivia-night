@@ -890,7 +890,7 @@ Resources:
               runCommand:
                 - '#!/bin/bash'
                 # - set -euo pipefail # Uncomment to throw error on failure
-                - !Sub sudo -u ${CodeEditorUser} curl -fsSL https://astral.sh/uv/install.sh -o /tmp/uv_install.sh
+                - !Sub sudo -u ${CodeEditorUser} curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors https://astral.sh/uv/install.sh -o /tmp/uv_install.sh
                 - !Sub sudo -i -u ${CodeEditorUser} bash /tmp/uv_install.sh 2>&1
                 - !Sub |
                     if uv generate-shell-completion bash &>/dev/null; then
