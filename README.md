@@ -43,6 +43,10 @@ Navigate to [Workshop Studio](https://catalog.us-east-1.prod.workshops.aws/works
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
 
+## Authors and acknowledgment
+
+Special thanks to Ekta Walia Bhullar, Rye Robinson, Robert Bradley, Ra Kowalski, Pierre de Malliard, and Paulo Gallotti for their contributions to this project and sharing their expertise in this field.
+
 ## License
 
 This library is licensed under the MIT-0 License. See the LICENSE file.
